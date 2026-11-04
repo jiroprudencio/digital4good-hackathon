@@ -14,9 +14,12 @@ for (const viewport of [{ width: 3860, height: 2160 }, { width: 1930, height: 98
     await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: SAVE_KEY, value: JSON.stringify(s) });
     await page.goto('/?theme=pocket&font=arcade');
     await expect(page.getByTestId('stacked-note')).toHaveCount(40);
+    const phoneBounds = await page.getByTestId('phone').locator('[data-app]').boundingBox();
+    expect(phoneBounds).not.toBeNull();
+    expect(phoneBounds!.width / phoneBounds!.height).toBeCloseTo(78 / 163.4, 2);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    for (const control of [page.getByTestId('earn'), page.getByRole('button', { name: 'Upgrade owned' }), page.getByRole('button', { name: /^Open phone/ }).first()]) {
+    for (const control of [page.getByTestId('earn'), page.getByRole('button', { name: 'Upgrade owned' }), page.getByTestId('phone')]) {
       await expect(control).toBeInViewport();
     }
     expect(await page.getByRole('list', { name: 'Life stages' }).locator('li').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain('Silkscreen');
@@ -35,12 +38,20 @@ test('five taps force an encounter; investigate, reload and resolve before resum
   const afterTap = await page.getByTestId('balance').innerText();
   await page.waitForTimeout(1200);
   await expect(page.getByTestId('balance')).toHaveText(afterTap);
-  await expect(page.getByRole('dialog', { name: 'Your simulated phone' })).not.toBeVisible();
+  await expect(page.getByTestId('phone')).toHaveAttribute('role', 'region');
+  await expect(page.getByTestId('event-shade')).not.toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('game.png'), fullPage: true });
   for (let i = 0; i < 4; i++) await page.getByTestId('earn').click();
-  const phone = page.getByRole('dialog', { name: 'Your simulated phone' });
+  const phone = page.getByTestId('phone');
   await expect(phone).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'dialog');
+  await expect(phone).toHaveAttribute('aria-modal', 'true');
+  await expect(page.getByTestId('event-shade')).toBeVisible();
+  for (const area of ['header', 'section[aria-label="Earn and save"]', 'section[aria-label^="Current scene:"]']) {
+    await expect(page.locator(area).first()).toHaveAttribute('inert', '');
+  }
   await expect(page.getByTestId('earn')).toBeDisabled();
+  await expect(page.locator('section[aria-label^="Current scene:"] button')).toBeDisabled();
   const held = await page.getByTestId('balance').innerText();
   await page.waitForTimeout(1200);
   await expect(page.getByTestId('balance')).toHaveText(held);
@@ -58,7 +69,12 @@ test('five taps force an encounter; investigate, reload and resolve before resum
   await phone.getByRole('button', { name: 'Decline politely' }).click();
   await phone.getByRole('button', { name: 'Confirm decision' }).click();
   await phone.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(phone).not.toBeVisible();
+  await expect(phone).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'region');
+  await expect(page.getByTestId('event-shade')).not.toBeVisible();
+  await expect(phone).not.toHaveAttribute('aria-modal', 'true');
+  await expect(page.locator('header').first()).not.toHaveAttribute('inert', '');
+  await expect(page.getByTestId('earn')).toBeEnabled();
   expect(errors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -76,7 +92,8 @@ for (const encounter of ENCOUNTERS) {
     }
     await page.addInitScript(({ key, value }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, value); }, { key: SAVE_KEY, value: JSON.stringify(s) });
     await page.goto('/');
-    const phone = page.getByRole('dialog', { name: 'Your simulated phone' });
+    const phone = page.getByTestId('phone');
+    await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
     await phone.getByRole('button', { name: new RegExp(encounter.sender.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
     if (encounter.id === 'uni-a') {
       await phone.getByRole('button', { name: /Try the introductory task/ }).click();
@@ -115,10 +132,81 @@ test('loaded game stays playable offline and reduced motion persists', async ({ 
   await page.getByText('Settings', { exact: true }).click();
   await context.setOffline(true);
   await page.getByTestId('earn').focus(); await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: /^Open phone/ }).first().click();
-  await expect(page.getByRole('dialog', { name: 'Your simulated phone' })).toBeVisible();
+  await expect(page.getByTestId('phone')).toHaveAttribute('role', 'region');
   await page.getByRole('button', { name: 'Bank', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your savings' })).toBeVisible();
+});
+
+test('persistent phone supports idle Bank browsing while taps continue', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start game' }).click();
+  const phone = page.getByTestId('phone');
+  await expect(phone).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'region');
+  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
+  await expect(phone.getByRole('heading', { name: 'Your savings' })).toBeVisible();
+  await expect(page.getByTestId('event-shade')).not.toBeVisible();
+  await page.getByTestId('earn').click();
+  await expect(page.getByTestId('balance')).toHaveText('70');
+  await expect(phone.getByRole('heading', { name: 'Your savings' })).toBeVisible();
+  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  await expect(phone.getByRole('button', { name: 'Messages', exact: true })).toBeVisible();
+  await expect(page.getByTestId('earn')).toBeEnabled();
+});
+
+test('outcome navigation retains spotlight until Resume tapping', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start game' }).click();
+  for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
+  const phone = page.getByTestId('phone');
+  await phone.getByRole('button', { name: 'Decline politely' }).click();
+  await phone.getByRole('button', { name: 'Confirm decision' }).click();
+  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
+  await expect(phone).toHaveAttribute('role', 'dialog');
+  await expect(page.getByTestId('event-shade')).toBeVisible();
+  await expect(page.getByTestId('earn')).toBeDisabled();
+  await phone.getByRole('button', { name: 'Resume tapping', exact: true }).click();
+  await expect(phone).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'region');
+  await expect(page.getByTestId('event-shade')).not.toBeVisible();
+  await expect(page.getByTestId('earn')).toBeEnabled();
+});
+
+test('notifications replace home requests and the external decision card stays within phone focus', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start game' }).click();
+  const phone = page.getByTestId('phone');
+  await phone.getByRole('button', { name: 'Open notification centre from top bar', exact: true }).click();
+  await expect(phone.getByText('No notifications', { exact: true })).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'region');
+  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
+  const card = page.getByTestId('decision-card');
+  await expect(card).toBeVisible();
+  expect(await card.evaluate(el => el.closest('[data-app]') === null)).toBe(true);
+  const handsetBounds = (await phone.locator('[data-app]').boundingBox())!;
+  const cardBounds = (await card.boundingBox())!;
+  if (page.viewportSize()!.width > 760) expect(cardBounds.x + cardBounds.width).toBeLessThan(handsetBounds.x);
+  else expect(cardBounds.y).toBeGreaterThanOrEqual(handsetBounds.y + handsetBounds.height);
+  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  await expect(phone.getByRole('heading', { name: 'Requests', exact: true })).toHaveCount(0);
+  await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
+  await expect(phone.getByRole('region', { name: 'Notification Centre', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(phone.getByRole('region', { name: 'Notification Centre', exact: true })).toBeVisible();
+  await expect(card).toBeVisible();
+  await phone.getByRole('region', { name: 'Notification Centre', exact: true }).getByRole('button').first().click();
+  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'Decline politely', exact: true })).toBeVisible();
+  await card.getByRole('button', { name: 'Decline politely', exact: true }).click();
+  await card.getByRole('button', { name: 'Confirm decision', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(phone.getByRole('button', { name: 'Open notification centre from top bar', exact: true })).toBeFocused();
+  await card.getByRole('button', { name: 'Confirm decision', exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('event-shade')).toBeVisible();
 });
 
 test('holding the note performs one tap and no repeated income', async ({ page }) => {
@@ -172,18 +260,21 @@ test('development exit preserves evidence and resumes clicks until the request i
   await page.goto('/');
   await page.getByRole('button', { name: 'Start game' }).click();
   for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
-  const phone = page.getByRole('dialog', { name: 'Your simulated phone' });
+  const phone = page.getByTestId('phone');
   await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
   await phone.getByRole('button', { name: 'Contacts', exact: true }).click();
   await phone.getByRole('button', { name: /Call LoopMarket support/ }).click();
   const before = Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''));
   await phone.getByRole('button', { name: 'Exit request (dev)' }).click();
-  await expect(phone).not.toBeVisible();
+  await expect(phone).toBeVisible();
+  await expect(phone).toHaveAttribute('role', 'region');
+  await expect(page.getByTestId('event-shade')).not.toBeVisible();
   await page.getByTestId('earn').click();
   expect(Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''))).toBe(before + 20);
-  await page.getByRole('button', { name: /^Open phone/ }).first().click();
   await expect(phone.getByRole('region', { name: 'LoopMarket support' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Return to request', exact: true }).first().click();
+  await phone.getByRole('button', { name: 'Resume request', exact: true }).click();
+  await expect(phone).toHaveAttribute('role', 'dialog');
+  await expect(page.getByTestId('event-shade')).toBeVisible();
   await phone.getByRole('button', { name: 'Decline politely' }).click();
   await phone.getByRole('button', { name: 'Confirm decision' }).click();
   await expect(phone.getByText('Verification demonstrated', { exact: true })).toBeVisible();
@@ -228,11 +319,12 @@ test('saved campus bulletin and archived chats remain accessible during a pendin
   s.phone = { open: true, app: 'messages', caseId: 'uni-a', record: null };
   await page.addInitScript(({ key, value }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, value); }, { key: SAVE_KEY, value: JSON.stringify(s) });
   await page.goto('/');
-  const phone = page.getByRole('dialog', { name: 'Your simulated phone' });
+  const phone = page.getByTestId('phone');
   await phone.getByRole('button', { name: 'Back to chats', exact: true }).click();
   await phone.getByRole('button', { name: /Jamie · LoopMarket/ }).click();
   await expect(phone.getByRole('button', { name: 'Read outcome' })).toBeVisible();
   await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
+  await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
   await phone.getByRole('button', { name: /Rae · flexible work/ }).click();
   await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
   await phone.getByRole('button', { name: 'Mail', exact: true }).click();

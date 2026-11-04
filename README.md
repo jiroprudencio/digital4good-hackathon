@@ -28,11 +28,11 @@ Deploy `dist/` to a static host when ready. There is no backend to deploy. The g
 - Notes use denominations of SGD 10, 50, 100 and 1,000 across the four stages. Each full note in a tap is drawn as a separate layer in the stack (base counts 2, 4, 20 and 10). The school item bonus leaves SGD 4 or SGD 8 in change, displayed separately so the total stays exact.
 - Buy one optional upgrade per chapter to double that chapter's earnings. The genuine school purchase adds a school-only 20% bonus.
 - The first request opens automatically after five accepted taps. The next opens after five additional taps following the first resolution.
-- A pending request blocks earning, upgrades and chapter advancement. Use the phone apps to investigate, make a decision and read the outcome. Escape cannot bypass an unresolved request. Declining remains available if a payment is unaffordable. Phone use and hidden tabs pause the clock.
+- A pending request blocks earning, upgrades and chapter advancement. Use the phone apps to investigate, make a decision and read the outcome. Escape cannot bypass an unresolved request. Declining remains available if a payment is unaffordable. Mandatory requests, outcome reading and hidden tabs pause the clock; idle phone browsing does not.
 - Reach the chapter's lifetime-earning threshold and resolve its requests to advance automatically. Read and close the outcome before moving on. The final milestone requires **one million SGD held** and every request resolved.
-- On small screens, **Upgrades & progress** opens the chapter controls; the phone button stays available at the bottom.
+- The phone stays in the right column. Upgrades and stage progress sit below the scene. Requests dim the rest of the game and move keyboard focus to the phone until the request and outcome are addressed. On mobile, the phone is inline below the scene; incoming requests scroll it into view.
 - **Restart** opens a confirmation and an optional save download before clearing the current run.
-- In the development server, **Exit request (dev)** closes a mandatory request without resolving it. Continue testing taps, then reopen the phone to return to it. Reloading restores the pending request. Production builds omit this control and ignore the bypass action.
+- In the development server, **Exit request (dev)** removes the spotlight without resolving the request. Continue testing taps, then choose **Resume request** or navigate in the phone to return to it. Reloading restores the pending request. Production builds omit this control and ignore the bypass action.
 - **Less motion** and the operating system's reduced-motion preference stop decorative animations.
 
 All monetary amounts are stored as integer cents. Deliberate encounter transactions (introductory commission, approved shift and work reward) remain; ordinary income only comes from taps. These transactions do not count toward lifetime tap earnings. Employer invoice losses stay separate from personal savings. Older saves retain their balances and gain no further idle income.
@@ -55,7 +55,7 @@ Open `http://127.0.0.1:5173/?view=themes` for five live previews, or use **Theme
 
 Pocket and Silkscreen + IBM Plex Sans are the defaults. Open `http://127.0.0.1:5173/?view=fonts` to compare Silkscreen with IBM Plex Sans, DM Sans, Inter, Nunito Sans and Source Sans 3. Select a pairing under Settings to apply it. Life-stage labels also use Silkscreen. All fonts are bundled locally under their included OFL licenses. `artifacts/silkscreen-pairings.png` is a standalone type specimen, not an application screenshot; reproduce it with `python scripts/render-font-pairings.py` (Pillow required).
 
-The desktop game fills the available viewport width and height with three columns. The main game page does not scroll on desktop; compact settings live in a dropdown, scenery scales to the remaining height, and the sidebar can scroll internally on unusually short windows. Target display: 3860 x 2160, including scaled laptop viewports. Smaller mobile viewports stack the controls. The phone uses system-style typography independently of the game's selected pairing.
+The desktop game fills the available viewport width and height with three columns. The main game page does not scroll on desktop; compact settings live in a dropdown, scenery scales to the remaining height, and phone content scrolls internally. Target display: 3860 x 2160, including scaled laptop viewports. Smaller mobile viewports stack the controls. The phone body uses the iPhone 18 Pro Max width-to-height ratio of 78:163.4, based on [Apple specifications](https://support.apple.com/en-lamr/148591), with a maximum width of 440 CSS pixels and a smaller size when available height requires it. The money and scene columns share the remaining width. The phone uses system-style typography independently of the game's selected pairing.
 
 Phone references reviewed 4 November 2026:
 
@@ -63,7 +63,9 @@ Phone references reviewed 4 November 2026:
 - [Gmail for iOS](https://apps.apple.com/us/app/gmail-email-by-google/id422689480): rounded search, inbox rows, sender details and plain mail reading surfaces.
 - [Apple's Phone guide](https://support.apple.com/en-ae/guide/iphone/iph3c993cbc/ios): Recents, Contacts, separate incoming/outgoing records and saved-contact routes.
 
-These are simulated app-inspired screens, not embedded clients or pixel-certified replicas. Game decisions stay in a distinct panel below the scrolling conversation, with a solid primary action, an outlined decline button and a red-outlined report button. Browser has been removed; marketplace checks use saved support contacts and campus records appear in Mail. Old saves migrate to those routes without losing history.
+Requests live in Notification Centre, reached by swiping down from the phone status bar, clicking that bar, or using the notification bell. Notifications open their original conversations and remain available across stages and reloads. The home screen contains only apps.
+
+These are simulated app-inspired screens, not embedded clients or pixel-certified replicas. During an event, decisions appear in a floating card immediately left of the phone, above the darkened scene, with a solid primary action, an outlined decline button and a red-outlined report button. The card stays available while checking other apps. Both phone and decision card share the keyboard focus boundary. On narrow screens the card follows the phone so it cannot cover navigation. Browser has been removed; marketplace checks use saved support contacts and campus records appear in Mail. Old saves migrate to those routes without losing history.
 
 ## Content and learning design
 
@@ -113,7 +115,7 @@ The reducer suite covers safe and mistaken decisions, independent evidence, insu
 
 The Playwright suite covers desktop and mobile layouts, all five themes, keyboard earning, all eight investigation flows, confirmations, reloads, reduced motion and continued play after going offline. It currently uses installed Microsoft Edge (`channel: 'msedge'`). On another machine, install Chromium using `npx playwright install chromium` and remove that channel setting from `playwright.config.ts`.
 
-**Validation status:** production build and 71 unit tests pass. Hallmark static checking finds no failures; white app surfaces follow the requested iOS/Gmail references. Its static contrast resolver does not distinguish every nested theme; visual browser review is still pending. A QA subagent reviewed the new rules, tests and interface code. Browser execution, screenshots and visual review remain blocked by a saved browser permission setting; the Playwright suite is prepared but has not run. No first-time human playtests have been conducted.
+**Validation status:** production build and 83 unit tests pass. Hallmark static checking finds no failures; white app surfaces follow the requested iOS/Gmail references. Its static contrast resolver does not distinguish every nested theme; visual browser review is still pending. A QA subagent reviewed the new rules, tests and interface code. Browser execution, screenshots and visual review remain blocked by a saved browser permission setting; the Playwright suite is prepared but has not run. No first-time human playtests have been conducted.
 
 ## First playtest
 
