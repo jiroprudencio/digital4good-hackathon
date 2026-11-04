@@ -55,7 +55,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
     content.current?.scrollTo(0, 0);
     const heading = content.current?.querySelector<HTMLElement>('h2');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
-  }, [s.phone.app, s.phone.caseId]);
+  }, [s.phone.app, s.phone.caseId, s.phone.record === 'list']);
   useEffect(() => {
     if (s.phone.record && s.phone.record !== 'list') {
       openedRecord.current?.focus({ preventScroll: true });
@@ -82,7 +82,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
   }
   function evidenceButton(v: Evidence) {
     return <button className={styles.evidenceButton} key={v.id} onClick={() => dispatch({ type: 'INSPECT', id: v.id })}>
-      <span className={styles.evidenceIcon}>{v.call ? <PhoneCall size={18} /> : <BookOpen size={18} />}</span><span><strong>{v.call ? `${v.id === 'incoming' ? 'Answer' : 'Call'} ${v.title}` : v.title}</strong><small>{v.origin}</small></span><ChevronRight size={18} />
+      <span className={styles.evidenceIcon}>{v.call ? <PhoneCall size={18} /> : <BookOpen size={18} />}</span><span><strong>{v.call && !v.title.startsWith('Call ') ? `${v.id === 'incoming' ? 'Answer' : 'Call'} ${v.title}` : v.title}</strong><small>{v.origin}</small></span><ChevronRight size={18} />
     </button>;
   }
   function context() {
