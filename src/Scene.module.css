@@ -1,0 +1,41 @@
+.scene {
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface-alt);
+  isolation: isolate;
+}
+.scene > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.clouds { animation: drift 14s ease-in-out infinite alternate; }
+.traffic { animation: pass 19s linear infinite; }
+.fan { animation: turn 6s linear infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+.leaves { animation: sway 5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center bottom; }
+.cursor { animation: blink 1.25s steps(1, end) infinite; }
+.twinkle { animation: shimmer 4s ease-in-out infinite alternate; }
+.monitor { animation: shimmer 7s ease-in-out infinite alternate; }
+.lift { animation: ascend 11s ease-in-out infinite alternate; }
+.steam { animation: steam 4s ease-in-out infinite; }
+.curtain { animation: sway 6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center top; }
+.avatar { animation: breathe 4s ease-in-out infinite alternate; }
+.banknote { width: 100%; height: auto; display: block; overflow: visible; }
+.earnNotes { display: grid; gap: 16px; }
+.noteGroup { display: grid; gap: 8px; text-align: center; }
+.earnNotes > strong { text-align: center; }
+.mascot { width: 86px; height: 86px; flex: 0 0 auto; image-rendering: pixelated; }
+.still * { animation: none !important; }
+@keyframes drift { from { transform: translateX(-7px); } to { transform: translateX(8px); } }
+@keyframes pass { from { transform: translateX(-90px); } to { transform: translateX(430px); } }
+@keyframes turn { to { transform: rotate(360deg); } }
+@keyframes sway { from { rotate: -1deg; } to { rotate: 1deg; } }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes shimmer { from { opacity: .65; } to { opacity: 1; } }
+@keyframes ascend { from { transform: translateY(0); } to { transform: translateY(77px); } }
+@keyframes steam { 0%, 100% { opacity: 0; transform: translateY(2px); } 40%, 70% { opacity: .8; transform: translateY(-4px); } }
+@keyframes breathe { from { opacity: 1; } to { opacity: .97; } }
+@media (prefers-reduced-motion: reduce) {
+  .scene * { animation: none !important; }
+}
