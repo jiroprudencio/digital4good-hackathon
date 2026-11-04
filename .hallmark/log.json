@@ -1,0 +1,67 @@
+[
+  {
+    "date": "2026-11-04",
+    "scope": "app update",
+    "features": [
+      "automatic stages",
+      "tap-value note bundles",
+      "font comparisons",
+      "iOS-inspired app screens",
+      "restart",
+      "development exit",
+      "full-width three columns"
+    ],
+    "user_overrides": [
+      "Phone intentionally resembles iOS, Telegram and Gmail",
+      "White app surfaces preserve requested references",
+      "Available desktop width used instead of capped container",
+      "Browser-default sizes with optional Google Font families"
+    ],
+    "validation": {
+      "unit_tests": 71,
+      "build": "passed",
+      "static": "0 FAIL; white-surface reflexes accepted; nested-theme contrast warnings reviewed in source",
+      "browser": "Not run: saved browser access permission blocks localhost"
+    },
+    "review": "QA engineer reviewed reducer, navigation, provenance and app distinctions"
+  },
+  {
+    "date": "2026-11-04",
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "themes": [
+      "Hum",
+      "Almanac",
+      "Arcade",
+      "Dusk",
+      "Cobalt"
+    ],
+    "signature": "Tap a specimen SGD note, then investigate an interrupting request",
+    "files": [
+      "src/App.tsx",
+      "src/Phone.tsx",
+      "src/Scene.tsx",
+      "src/game.ts",
+      "src/content.ts",
+      "src/tokens.css",
+      "src/base.css",
+      "src/App.module.css",
+      "src/Phone.module.css",
+      "src/ThemeGallery.tsx",
+      "src/ThemeGallery.module.css"
+    ],
+    "static_sweep": {
+      "fail": 0,
+      "reflex": 0,
+      "warn": 0
+    },
+    "render_sweep": "Not run: saved browser permission denies localhost",
+    "review": "QA subagent: save isolation, typography, tap economy, migration, forced encounter flow",
+    "user_overrides": [
+      "Browser default typography",
+      "Original SVG pixel game art",
+      "Explicit event interruption instead of optional phone use"
+    ]
+  }
+]

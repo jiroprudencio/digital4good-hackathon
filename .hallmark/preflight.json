@@ -1,0 +1,13 @@
+{
+  "scanned": "2026-11-04",
+  "scope": "app",
+  "findings": {
+    "framework": "React TypeScript Vite, src/App.tsx and src/Phone.tsx",
+    "fonts": "Previously explicit sizes throughout App.module.css and Phone.module.css; user requested browser defaults",
+    "material": "Existing original SVG game scenes, eight authored scam/legitimate encounters, currency and prototype economy supplied by user"
+  },
+  "preserve": ["encounter evidence and outcomes", "saved balances", "pixel life scenes", "independent phone investigation"],
+  "introduce": ["tap-only income", "no click cooldown", "forced events after five taps", "SGD specimen illustrations", "five live theme previews"],
+  "user_overrides": ["No explicit font sizes or custom fonts", "Remove promotional copy", "Keep pixel artwork and simulated phone"],
+  "render_status": "Blocked by saved browser origin permission; no alternate browser renderer attempted"
+}
