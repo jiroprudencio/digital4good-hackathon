@@ -1,0 +1,11 @@
+/* Typography comparisons: use native element sizes for every pairing. */
+@import './base.css';
+.gallery { padding: 32px; }
+.gallery header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 48px; padding-block: 32px; border-top: 1px solid var(--rule); }
+.specimen { background: var(--surface); padding: 24px 32px; }
+.specimen h1 { margin-top: 0; }
+.specimen p { max-width: 70ch; }
+.buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
+.buttons a { display: inline-block; padding: 12px 20px; background: var(--accent); color: var(--accent-ink); border-radius: 12px; text-decoration: none; }
+@media(max-width: 760px) { .gallery { padding: 20px; } .row { grid-template-columns: minmax(0, 1fr); gap: 16px; } .specimen { padding: 20px; } }

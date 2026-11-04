@@ -1,0 +1,62 @@
+[
+  {
+    "family": "Nunito",
+    "file": "nunito.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/nunito/Nunito[wght].ttf",
+    "license": "nunito-OFL.txt"
+  },
+  {
+    "family": "DM Sans",
+    "file": "dmsans.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/dmsans/DMSans[opsz,wght].ttf",
+    "license": "dmsans-OFL.txt"
+  },
+  {
+    "family": "Space Grotesk",
+    "file": "spacegrotesk.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/spacegrotesk/SpaceGrotesk[wght].ttf",
+    "license": "spacegrotesk-OFL.txt"
+  },
+  {
+    "family": "Inter",
+    "file": "inter.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/inter/Inter[opsz,wght].ttf",
+    "license": "inter-OFL.txt"
+  },
+  {
+    "family": "Outfit",
+    "file": "outfit.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/outfit/Outfit[wght].ttf",
+    "license": "outfit-OFL.txt"
+  },
+  {
+    "family": "Source Sans 3",
+    "file": "sourcesans3.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/sourcesans3/SourceSans3[wght].ttf",
+    "license": "sourcesans3-OFL.txt"
+  },
+  {
+    "family": "Pixelify Sans",
+    "file": "pixelifysans.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/pixelifysans/PixelifySans[wght].ttf",
+    "license": "pixelifysans-OFL.txt"
+  },
+  {
+    "family": "Nunito Sans",
+    "file": "nunitosans.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/nunitosans/NunitoSans[YTLC,opsz,wdth,wght].ttf",
+    "license": "nunitosans-OFL.txt"
+  },
+  {
+    "family": "Silkscreen",
+    "file": "silkscreen.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/silkscreen/Silkscreen-Regular.ttf",
+    "license": "silkscreen-OFL.txt"
+  },
+  {
+    "family": "IBM Plex Sans",
+    "file": "ibmplexsans.ttf",
+    "source": "https://github.com/google/fonts/blob/main/ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf",
+    "license": "ibmplexsans-OFL.txt"
+  }
+]
