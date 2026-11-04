@@ -24,6 +24,8 @@
 .banknote { width: 100%; height: auto; display: block; overflow: visible; }
 .earnNotes { display: grid; gap: 16px; }
 .noteGroup { display: grid; gap: 8px; text-align: center; }
+.cashStack { display: block; position: relative; width: 100%; aspect-ratio: 340 / 225; }
+.stackedNote { position: absolute; width: calc(100% - var(--spread)); left: calc(var(--i) * var(--step)); top: calc((var(--count) - 1 - var(--i)) * var(--step)); }
 .earnNotes > strong { text-align: center; }
 .mascot { width: 86px; height: 86px; flex: 0 0 auto; image-rendering: pixelated; }
 .still * { animation: none !important; }

@@ -1,9 +1,8 @@
-export function noteBundle(cents: number) {
-  let remaining = cents;
-  const notes: { denomination: number; count: number }[] = [];
-  for (const denomination of [1000, 100, 50, 10, 2]) {
-    const count = Math.floor(remaining / (denomination * 100));
-    if (count) { notes.push({ denomination, count }); remaining -= count * denomination * 100; }
-  }
+export const STAGE_DENOMINATIONS = [10, 50, 100, 1000] as const;
+export function noteBundle(cents: number, stage: number) {
+  const denomination = STAGE_DENOMINATIONS[stage];
+  const count = Math.floor(cents / (denomination * 100));
+  const notes = count ? [{ denomination, count }] : [];
+  const remaining = cents - count * denomination * 100;
   return { notes, remaining };
 }

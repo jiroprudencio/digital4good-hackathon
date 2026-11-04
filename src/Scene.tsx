@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import type { CSSProperties } from 'react'
 import styles from './Scene.module.css'
 import { noteBundle } from './notes'
 import { money } from './content'
@@ -167,12 +168,16 @@ export function Banknote({ className = '', denomination = 10 }: { className?: st
   </svg>;
 }
 
-export function EarnNotes({ cents }: { cents: number }) {
-  const bundle = noteBundle(cents);
+export function EarnNotes({ cents, stage }: { cents: number; stage: number }) {
+  const bundle = noteBundle(cents, stage);
   return <span className={styles.earnNotes} data-testid="note-bundle" aria-label={`Note bundle totals SGD ${money(cents)} per click`}>
-    {bundle.notes.map(note => <span className={styles.noteGroup} key={note.denomination}><Banknote denomination={note.denomination} /><span>{note.count} × SGD {note.denomination.toLocaleString('en-SG')}</span></span>)}
-    {bundle.remaining > 0 && <span>Coins: SGD {money(bundle.remaining)}</span>}
-    <strong>SGD {money(cents)}</strong>
+    {bundle.notes.map(note => <span className={styles.noteGroup} key={note.denomination}>
+      <span className={styles.cashStack} aria-hidden="true" style={{ '--count': note.count, '--step': `${Math.min(6, 60 / Math.max(1, note.count - 1))}px`, '--spread': `${Math.min(60, (note.count - 1) * 6)}px` } as CSSProperties}>
+        {Array.from({ length: note.count }, (_, i) => <span className={styles.stackedNote} key={i} data-testid="stacked-note" style={{ '--i': i } as CSSProperties}><Banknote denomination={note.denomination} /></span>)}
+      </span>
+      <span>{note.count} × SGD {note.denomination.toLocaleString('en-SG')}</span>
+    </span>)}
+    {bundle.remaining > 0 && <span>+ SGD {money(bundle.remaining)} bonus change</span>}
   </span>;
 }
 
