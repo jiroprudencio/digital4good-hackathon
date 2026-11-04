@@ -85,7 +85,7 @@
   .chapters { margin: 0; }
   .chapters li { padding: 12px 8px; }
   .gameGrid { min-height: 0; align-items: stretch; gap: 24px; }
-  .moneyPanel { min-height: 0; display: flex; flex-direction: column; padding: 0; }
+  .moneyPanel { min-height: 0; display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
   .money { margin: 4px 0 8px; }
   .noteArea { flex: 1; min-height: 0; justify-items: center; }
   .note { max-width: clamp(100px, calc((100dvh - 340px) * 1.3), 440px); }
