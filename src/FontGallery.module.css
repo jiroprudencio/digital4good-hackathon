@@ -9,3 +9,5 @@
 .buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
 .buttons a { display: inline-block; padding: 12px 20px; background: var(--accent); color: var(--accent-ink); border-radius: 12px; text-decoration: none; }
 @media(max-width: 760px) { .gallery { padding: 20px; } .row { grid-template-columns: minmax(0, 1fr); gap: 16px; } .specimen { padding: 20px; } }
+
+.stageSample { font-family: var(--font-heading); }

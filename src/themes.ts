@@ -9,6 +9,6 @@ export type Theme = typeof THEMES[number]['id'];
 export function initialTheme(): Theme {
   const param = new URLSearchParams(location.search).get('theme');
   let saved: string | null = null;
-  try { saved = localStorage.getItem('scamagotchi.theme'); } catch { /* Optional preference. */ }
+  try { saved = localStorage.getItem('scamagotchi.theme.v2'); } catch { /* Optional preference. */ }
   return THEMES.find(t => t.id === (param ?? saved))?.id ?? 'pocket';
 }

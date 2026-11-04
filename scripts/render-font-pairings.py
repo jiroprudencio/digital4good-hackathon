@@ -4,11 +4,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 PAIRS = [
-    ('Nunito + DM Sans', 'nunito', 'dmsans', 'Rounded and readable. Recommended.'),
-    ('Space Grotesk + Inter', 'spacegrotesk', 'inter', 'Crisp headings, neutral interface.'),
-    ('Outfit + Source Sans 3', 'outfit', 'sourcesans3', 'Friendly shapes, clear reading.'),
-    ('Pixelify Sans + Nunito Sans', 'pixelifysans', 'nunitosans', 'Pixel headings with smooth body text.'),
-    ('Silkscreen + IBM Plex Sans', 'silkscreen', 'ibmplexsans', 'Arcade headings with practical body text.'),
+    ('Silkscreen + IBM Plex Sans', 'silkscreen', 'ibmplexsans', 'Current pairing. Structured and easy to read.'),
+    ('Silkscreen + DM Sans', 'silkscreen', 'dmsans', 'Rounder, softer interface text.'),
+    ('Silkscreen + Inter', 'silkscreen', 'inter', 'Neutral and compact interface text.'),
+    ('Silkscreen + Nunito Sans', 'silkscreen', 'nunitosans', 'Friendly curves beside pixel headings.'),
+    ('Silkscreen + Source Sans 3', 'silkscreen', 'sourcesans3', 'Open letterforms for longer messages.'),
 ]
 
 def font(name, size, weight=400):
@@ -24,7 +24,7 @@ def font(name, size, weight=400):
 image = Image.new('RGB', (1440, 2460), '#f7f6f0')
 draw = ImageDraw.Draw(image)
 ink, muted, line = '#222720', '#5e665a', '#d7d9ce'
-draw.text((64, 42), 'Scamagotchi / Font pairings', font=font('inter', 38, 650), fill=ink)
+draw.text((64, 42), 'Scamagotchi / Silkscreen pairings', font=font('inter', 38, 650), fill=ink)
 draw.text((64, 100), 'Same sizes and content. Heading family + reading family.', font=font('inter', 24), fill=muted)
 for index, (label, heading, body, note) in enumerate(PAIRS):
     y = 166 + index * 450
@@ -40,7 +40,7 @@ for index, (label, heading, body, note) in enumerate(PAIRS):
     draw.text((342, y + 345), '+SGD 20 per tap', font=font(body, 28), fill=ink)
     draw.text((900, y + 345), '0123456789 / I l 1 / O 0', font=font(body, 27), fill=muted)
 
-output = ROOT / 'artifacts' / 'font-pairings.png'
+output = ROOT / 'artifacts' / 'silkscreen-pairings.png'
 output.parent.mkdir(exist_ok=True)
 image.save(output)
 print(output)

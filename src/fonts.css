@@ -14,5 +14,9 @@
 [data-font='friendly'] { --font-heading: 'Outfit', sans-serif; --font-body: 'Source Sans 3', sans-serif; }
 [data-font='pixel'] { --font-heading: 'Pixelify Sans', sans-serif; --font-body: 'Nunito Sans', sans-serif; }
 [data-font='arcade'] { --font-heading: 'Silkscreen', monospace; --font-body: 'IBM Plex Sans', sans-serif; }
+[data-font='silk-dm'] { --font-heading: 'Silkscreen', monospace; --font-body: 'DM Sans', sans-serif; }
+[data-font='silk-inter'] { --font-heading: 'Silkscreen', monospace; --font-body: 'Inter', sans-serif; }
+[data-font='silk-nunito'] { --font-heading: 'Silkscreen', monospace; --font-body: 'Nunito Sans', sans-serif; }
+[data-font='silk-source'] { --font-heading: 'Silkscreen', monospace; --font-body: 'Source Sans 3', sans-serif; }
 [data-font]:not([data-font='default']) { font-family: var(--font-body); }
 [data-font]:not([data-font='default']) h1, [data-font]:not([data-font='default']) h2, [data-font]:not([data-font='default']) h3 { font-family: var(--font-heading); }
