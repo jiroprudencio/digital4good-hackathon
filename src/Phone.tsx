@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, ReactNode, RefObject } from 'react';
-import { ArrowDownLeft, ArrowUpRight, BatteryFull, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, Home, Mail, MessageCircle, PhoneCall, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
-import { CASES, ENCOUNTERS, money, STAGES } from './content';
+import { ArrowDownLeft, ArrowUpRight, BatteryFull, Bell, BookOpen, Check, ChevronLeft, ChevronRight, ExternalLink, Home, Mail, PhoneCall, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
+import { CASES, money, STAGES } from './content';
 import type { Decision, Evidence, PhoneApp } from './content';
 import type { Action, GameState } from './game';
 import { activeCase } from './game';
 import { Mascot } from './Scene';
 import styles from './Phone.module.css';
 
-export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: () => void) {
+export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: () => void, enabled = true, lockScroll = true) {
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
+    if (!enabled) return;
     const before = document.activeElement as HTMLElement | null;
     const root = ref.current;
     const oldOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (lockScroll) document.body.style.overflow = 'hidden';
     (root?.querySelector<HTMLElement>('[data-dialog-focus]') ?? root?.querySelector<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select, summary, [tabindex="0"]'))?.focus();
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
@@ -27,8 +28,8 @@ export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: 
       else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('keydown', key); document.body.style.overflow = oldOverflow; if (before?.isConnected) before.focus(); };
-  }, [ref]);
+    return () => { document.removeEventListener('keydown', key); if (lockScroll) document.body.style.overflow = oldOverflow; if (before?.isConnected) before.focus(); };
+  }, [ref, enabled, lockScroll]);
 }
 const apps: { id: PhoneApp; name: string; icon: typeof Mail; color: string }[] = [
   { id: 'messages', name: 'Messages', icon: Send, color: 'var(--telegram)' },
@@ -38,24 +39,29 @@ const apps: { id: PhoneApp; name: string; icon: typeof Mail; color: string }[] =
   { id: 'bank', name: 'Bank', icon: Wallet, color: 'var(--bank-blue)' },
 ];
 
-export default function Phone({ state: s, dispatch }: { state: GameState; dispatch: Dispatch<Action> }) {
+export default function Phone({ state: s, dispatch, spotlight }: { state: GameState; dispatch: Dispatch<Action>; spotlight: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const openedRecord = useRef<HTMLElement>(null);
   const [confirm, setConfirm] = useState<Decision | null>(null);
   const [query, setQuery] = useState('');
   const confirmRef = useRef<HTMLDivElement>(null);
+  const swipeStart = useRef<number | null>(null);
   const id = s.phone.caseId;
   const e = id ? CASES[id] : null;
   const p = id ? s.progress[id] : null;
   const close = () => { setConfirm(null); dispatch({ type: 'PHONE', open: false }); };
-  useDialogFocus(ref, () => { if (confirm) setConfirm(null); else close(); });
+  useDialogFocus(ref, () => { if (confirm) setConfirm(null); else close(); }, spotlight, false);
+  useEffect(() => {
+    if (spotlight && matchMedia('(max-width: 760px)').matches) ref.current?.scrollIntoView({ block: 'start' });
+    if (!s.phone.open) setConfirm(null);
+  }, [spotlight, s.phone.open]);
   useEffect(() => {
     setQuery('');
     content.current?.scrollTo(0, 0);
     const heading = content.current?.querySelector<HTMLElement>('h2');
-    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
-  }, [s.phone.app, s.phone.caseId, s.phone.record === 'list']);
+    if (heading && spotlight) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  }, [s.phone.app, s.phone.caseId, s.phone.record === 'list', spotlight]);
   useEffect(() => {
     if (s.phone.record && s.phone.record !== 'list') {
       openedRecord.current?.focus({ preventScroll: true });
@@ -65,7 +71,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
   useEffect(() => { if (confirm) { confirmRef.current?.scrollIntoView({ block: 'nearest' }); confirmRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [confirm]);
   const navigate = (app: PhoneApp) => { setConfirm(null); dispatch({ type: 'APP', app }); };
   const select = (caseId: string) => { setConfirm(null); dispatch({ type: 'CASE', id: caseId }); };
-  const arrived = ENCOUNTERS.filter(c => s.progress[c.id].arrived);
+  const arrived = s.order.flat().filter(caseId => s.progress[caseId].arrived).map(caseId => CASES[caseId]);
   const record = e?.evidence.find(v => v.id === s.phone.record);
   const pending = activeCase(s);
   const inConversation = !!e && e.channel === s.phone.app && s.phone.record !== 'list';
@@ -86,14 +92,14 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
     </button>;
   }
   function context() {
-    if (!e) return <Empty icon={<Smartphone />} text="Your phone is quiet for now." detail="Requests arrive as you go about your day. Close your phone to keep earning." />;
+    if (!e) return <Empty icon={<Smartphone />} text="Your phone is quiet for now." detail="Keep tapping. Requests arrive as you play." />;
     return <div className={styles.context}><small>Looking into</small><strong>{e.title}</strong><button onClick={() => select(e.id)}>Return to request <ArrowUpRight size={14} /></button></div>;
   }
   function decisionPanel() {
     if (!e || !p || p.result) return null;
     const affordable = s.cash >= e.cost * 100;
     return <section className={styles.decisions} aria-label="Make a decision">
-      <h3>Your decision</h3>
+      <h3>Your decision</h3><p className={styles.decisionSubject}>{e.sender}</p>
       <button className={styles.primary} disabled={!affordable} onClick={() => setConfirm('proceed')}>{e.proceed} {e.cost > 0 && <span>SGD {money(e.cost * 100)}</span>}</button>
       {!affordable && <p className={styles.hint}>You need SGD {money(e.cost * 100 - s.cash)} more. You can decline this request without paying.</p>}
       <div className={styles.twoButtons}><button className={styles.declineButton} onClick={() => setConfirm('decline')}>{e.stage === 2 ? 'Hold for review' : 'Decline politely'}</button><button className={styles.reportButton} onClick={() => setConfirm('report')}>Report concern</button></div>
@@ -120,11 +126,16 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
   }
   let body: ReactNode;
   if (s.phone.app === 'feedback') body = feedback();
+  else if (s.phone.app === 'notifications') body = <section className={styles.notificationCentre} aria-label="Notification Centre">
+    <h2>Notification Centre</h2>
+    {arrived.length ? [...arrived].reverse().map(item => <button key={item.id} className={styles.notificationCard} onClick={() => select(item.id)}>
+      <span className={styles.notificationApp}>{item.channel === 'mail' ? <Mail size={18} /> : <Send size={18} />} {item.channel === 'mail' ? 'Mail' : 'Messages'}<small>{s.progress[item.id].result ? 'Resolved' : 'Needs decision'}</small></span>
+      <strong>{item.sender}</strong><span>{item.preview}</span>
+    </button>) : <Empty icon={<Bell />} text="No notifications" detail="New requests will appear here." />}
+  </section>;
   else if (s.phone.app === 'home') body = <>
     <div className={styles.homeTitle}><h2>Apps</h2></div>
     <div className={styles.appGrid}>{apps.map(app => { const Icon = app.icon; const badge = app.id === 'messages' || app.id === 'mail' ? arrived.filter(c => c.channel === app.id && !s.progress[c.id].read).length : app.id === 'calls' && e?.stage === 2 && !p?.evidence.includes('incoming') && !p?.result ? 1 : 0; return <button key={app.id} aria-label={app.name} onClick={() => navigate(app.id)}><span style={{ background: app.color }}>{app.id === 'mail' ? <GmailIcon /> : <Icon size={31} strokeWidth={1.7} />}{badge > 0 && <b>{badge}</b>}</span>{app.name}</button>; })}</div>
-    <h3 className={styles.sectionTitle}>Requests</h3>{pending ? requestCard(pending) : <Empty icon={<MessageCircle />} text="No requests." detail="Close the phone to continue." />}
-    {arrived.some(c => s.progress[c.id].result) && <p className={styles.archiveHint}>Earlier conversations stay in Messages and Mail.</p>}
   </>;
   else if (s.phone.app === 'bank') body = <><h2>Your savings</h2><div className={styles.balance}><small>Simulated SGD</small><strong>SGD {money(s.cash)}</strong><p>Posted funds, including your game earnings.</p></div><h3 className={styles.sectionTitle}>Transactions</h3><div className={styles.transaction}><ArrowDownLeft /><span><strong>Lifetime game earnings</strong><small>Tap earnings · all chapters</small></span><b>+{money(s.gross)}</b></div>{[...s.ledger].reverse().map(l => <div className={styles.transaction} key={l.id}>{l.cents < 0 ? <ArrowUpRight /> : <ArrowDownLeft />}<span><strong>{l.title}</strong><small>{STAGES[l.stage].name}</small></span><b>{l.cents < 0 ? '−' : '+'}{money(Math.abs(l.cents))}</b></div>)}<p className={styles.archiveHint}>This ledger shows posted transactions in your personal account. Company invoice payments use a separate employer account.</p></>;
   else if ((isChat || isMail) && !inConversation) body = <>
@@ -139,7 +150,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
   else if ((s.phone.app === 'messages' || s.phone.app === 'mail') && e && p) body = <>
     {isMail ? <><h2>{e.title}</h2><div className={styles.threadHeading}><span className={styles.avatar}>{e.initials}</span><span><strong>{e.sender}</strong><small>to me <span aria-hidden="true">⌄</span></small></span><small>9:41</small></div></> : <div className={styles.chatDate}>Today</div>}
     <div className={isMail ? styles.mailBody : styles.bubbles}>{e.messages.map((m, i) => e.stage === 3 && i === 0 ? <div key={i} className={styles.earlierChat}><small>Earlier messages</small><p>“Dinner on Sunday?”</p><p className={styles.sentBubble}>“See you then!”</p><span>Today</span></div> : <p key={i}>{m}{isChat && <small className={styles.messageTime}>9:41</small>}</p>)}</div>
-    {e.id === 'uni-a' && !p.result && <button className={styles.evidenceButton} disabled={p.samplePaid} onClick={() => dispatch({ type: 'SAMPLE' })}><Wallet size={20} /><span><strong>{p.samplePaid ? 'Introductory task complete' : 'Try the introductory task'}</strong><small>{p.samplePaid ? 'SGD 50 received. You can open Bank to check.' : 'Complete one simulated task for SGD 50'}</small></span></button>}
+    {e.id === 'uni-a' && !p.result && s.phone.open && <button className={styles.evidenceButton} disabled={p.samplePaid} onClick={() => dispatch({ type: 'SAMPLE' })}><Wallet size={20} /><span><strong>{p.samplePaid ? 'Introductory task complete' : 'Try the introductory task'}</strong><small>{p.samplePaid ? 'SGD 50 received. You can open Bank to check.' : 'Complete one simulated task for SGD 50'}</small></span></button>}
     {e.evidence.filter(v => v.app === s.phone.app).map(evidenceButton)}
     {record && <EvidenceCard evidence={record} focusRef={openedRecord} />}
     {p.result && <button className={styles.primary} onClick={() => navigate('feedback')}>Read outcome</button>}
@@ -157,22 +168,22 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
     {e && <button className={styles.return} onClick={() => select(e.id)}>Return to request <ArrowUpRight size={16} /></button>}
   </>;
 
-  return <div className={styles.overlay}>
-    <div className={styles.pauseRibbon}><span /> Paused</div>
-    <div className={styles.phone} data-theme="ios" data-app={s.phone.app} ref={ref} role="dialog" aria-modal="true" aria-label="Your simulated phone">
-      <div className={styles.status} aria-hidden="true"><strong>9:41</strong><span className={styles.camera} /><span><Signal size={15} /><Wifi size={15} /><BatteryFull size={20} /></span></div>
+  return <div className={styles.panel} data-testid="phone" data-theme="ios" ref={ref} role={spotlight ? 'dialog' : 'region'} aria-modal={spotlight || undefined} aria-label="Your simulated phone">
+    <div className={styles.phone} data-app={s.phone.app}>
+      <button className={styles.status} aria-label="Open notification centre from top bar" title="Notifications (swipe down)" onClick={() => navigate('notifications')} onPointerDown={event => { swipeStart.current = event.clientY; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={event => { if (swipeStart.current !== null && event.clientY - swipeStart.current > 28) navigate('notifications'); swipeStart.current = null; }} onPointerCancel={() => { swipeStart.current = null; }}><strong>9:41</strong><span className={styles.camera} /><span aria-hidden="true"><Signal size={15} /><Wifi size={15} /><BatteryFull size={20} /></span></button>
       <header className={styles.header}>
         {inConversation ? <button aria-label={isMail ? 'Back to inbox' : 'Back to chats'} onClick={() => { setConfirm(null); dispatch({ type: 'APP', app: s.phone.app, list: true }); }}><ChevronLeft size={23} />{isChat && 'Chats'}</button> : <button aria-label="Phone home" onClick={() => { setConfirm(null); dispatch({ type: 'BACK' }); }}><Home size={20} /></button>}
-        <strong>{inConversation ? isChat ? e?.sender : 'Mail' : s.phone.app === 'home' ? 'Your phone' : s.phone.app === 'feedback' ? 'Outcome' : apps.find(app => app.id === s.phone.app)?.name}</strong>
-        {isChat && inConversation ? <span className={styles.avatar}>{e?.initials}</span> : !pending ? <button aria-label="Close phone and resume earning" onClick={close}><X size={20} /></button> : <span className={styles.headerSpacer} />}
+        <strong>{inConversation ? isChat ? e?.sender : 'Mail' : s.phone.app === 'home' ? 'Your phone' : s.phone.app === 'notifications' ? 'Notifications' : s.phone.app === 'feedback' ? 'Outcome' : apps.find(app => app.id === s.phone.app)?.name}</strong>
+        <button className={styles.notificationButton} aria-label="Open notification centre" onClick={() => navigate('notifications')}><Bell size={20} />{pending && <span className={styles.notificationBadge}>1</span>}</button>
       </header>
       <div className={styles.content} data-conversation={inConversation || undefined} ref={content}>{body}</div>
-      {inConversation && p && !p.result && <div className={styles.decisionDock}>{decisionPanel()}</div>}
       {(s.phone.app === 'calls' || s.phone.app === 'contacts') && <nav className={styles.phoneTabs} aria-label="Phone sections"><button aria-current={s.phone.app === 'calls' ? 'page' : undefined} onClick={() => navigate('calls')}><PhoneCall size={21} />Recents</button><button aria-current={s.phone.app === 'contacts' ? 'page' : undefined} onClick={() => navigate('contacts')}><Users size={21} />Contacts</button></nav>}
-      <footer className={styles.footer}><button aria-label={inConversation ? 'Phone home' : 'Open apps'} onClick={() => { setConfirm(null); dispatch({ type: 'BACK' }); }}><Home size={17} /> Apps</button>{pending ? import.meta.env.DEV ? <button className={styles.devExit} onClick={() => dispatch({ type: 'DEV_EXIT' })}>Exit request (dev) <X size={16} /></button> : <span>Resolve to continue</span> : <button onClick={close}>Close phone <X size={16} /></button>}</footer>
+      <footer className={styles.footer}><button aria-label={inConversation ? 'Phone home' : 'Open apps'} onClick={() => { setConfirm(null); dispatch({ type: 'BACK' }); }}><Home size={17} /> Apps</button>{pending && s.phone.open ? import.meta.env.DEV ? <button className={styles.devExit} onClick={() => dispatch({ type: 'DEV_EXIT' })}>Exit request (dev) <X size={16} /></button> : <span>Resolve to continue</span> : s.phone.open ? <button onClick={close}>Resume tapping <ArrowUpRight size={16} /></button> : pending ? <button onClick={() => select(pending)}>Resume request</button> : null}</footer>
       <div className={styles.homeIndicator} aria-hidden="true" />
     </div>
-    <p className={styles.outsideHint}><CircleHelp size={14} /> Simulated calls and payments.</p>
+    {pending && s.phone.open && <aside className={styles.decisionDock} data-testid="decision-card" aria-label="Request decisions">
+      {p && !p.result ? decisionPanel() : <><h3>Request waiting</h3><p>{CASES[pending].sender}</p><button className={styles.primary} onClick={() => select(pending)}>Return to request <ArrowUpRight size={16} /></button></>}
+    </aside>}
   </div>;
 }
 function GmailIcon() {

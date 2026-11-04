@@ -19,8 +19,8 @@
 .chapters { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 32px; padding: 0; border-bottom: 1px solid var(--rule); }
 .chapters li { padding: 16px 8px; color: var(--muted); font-family: var(--font-heading); }
 .chapters .currentChapter { color: var(--ink); font-weight: bold; border-bottom: 3px solid var(--accent); }
-.gameGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 32px; align-items: start; }
-.moneyPanel, .sidePanel { min-width: 0; padding: 16px 0; }
+.gameGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.2fr); gap: 32px; align-items: start; }
+.moneyPanel { min-width: 0; padding: 16px 0; }
 .moneyPanel > span { color: var(--muted); }
 .money { margin: 8px 0 24px; font-variant-numeric: tabular-nums; }
 .noteArea { position: relative; display: grid; align-items: center; min-height: 220px; }
@@ -33,22 +33,21 @@
 .goal { display: grid; gap: 12px; }
 .scenePanel { min-width: 0; overflow: hidden; border-radius: var(--radius); background: var(--surface-alt); }
 .sceneArt > div { width: 100%; }
-.phoneDock { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 16px 20px; background: var(--accent); color: var(--accent-ink); border: 0; text-align: left; }
-.phoneDock span { flex: 1; overflow-wrap: anywhere; }
-.phoneDock b { border: 1px solid currentColor; padding: 0 8px; border-radius: 50%; }
-.sidePanel h2 { margin: 0 0 16px; }
-.sidePanel p { color: var(--muted); }
+.phonePanel { position: relative; min-height: 0; min-width: 0; height: 100%; }
+.phoneSpotlight { z-index: 31; }
+.eventShade { position: fixed; inset: 0; z-index: 30; background: var(--veil); }
+.stageControls { background: var(--surface); padding: 16px; display: grid; gap: 12px; }
+.upgradeRow { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.upgradeRow > span { display: grid; gap: 4px; }
+.upgradeRow small, .stageControls > small { color: var(--muted); }
+.stageRequirement { display: grid; gap: 8px; }
+.stageRequirement > span { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
 .primary, .secondary { display: inline-flex; justify-content: center; align-items: center; gap: 12px; min-height: 44px; padding: 12px 16px; border: var(--edge) solid var(--rule); border-radius: var(--radius); text-decoration: none; }
 .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--shadow); }
 .secondary { background: var(--surface); color: var(--ink); }
 .primary:hover:not(:disabled), .secondary:hover:not(:disabled) { filter: brightness(.94); }
 .primary:active:not(:disabled), .secondary:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
-.nextChapter { margin-top: 40px; border-top: 1px solid var(--rule); padding-top: 8px; }
-.nextChapter label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
-.nextChapter p { display: flex; justify-content: space-between; gap: 12px; }
-.nextChapter .secondary { width: 100%; }
 .pageFooter { display: flex; flex-wrap: wrap; gap: 24px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 24px; margin-top: 32px; }
-.mobileShopToggle, .mobilePhone { display: none; }
 .announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .storage { padding: 16px 32px; background: var(--surface-alt); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .modalOverlay, .resultOverlay { position: fixed; inset: 0; background: var(--veil); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -84,22 +83,17 @@
   .main { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 16px; padding: 0 24px 12px; }
   .chapters { margin: 0; }
   .chapters li { padding: 12px 8px; }
-  .gameGrid { min-height: 0; align-items: stretch; gap: 24px; }
-  .moneyPanel { min-height: 0; display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
+  .gameGrid { display: flex; min-height: 0; align-items: stretch; gap: 24px; }
+  .moneyPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
   .money { margin: 4px 0 8px; }
   .noteArea { flex: 1; min-height: 0; justify-items: center; }
   .note { max-width: clamp(100px, calc((100dvh - 340px) * 1.3), 440px); }
   .tapHint { margin: 8px 0 12px; }
   .goal { gap: 8px; }
-  .scenePanel { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+  .scenePanel { flex: 1.5; display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+  .phonePanel { flex: 0 0 auto; align-self: center; width: auto; height: min(100%, calc(440px * 163.4 / 78)); aspect-ratio: 78 / 163.4; }
   .sceneArt, .sceneArt > div { height: 100%; min-height: 0; }
   .sceneArt svg { height: 100%; width: 100%; }
-  .phoneDock { min-height: 56px; padding: 12px 16px; }
-  .sidePanel { min-height: 0; overflow-y: auto; padding: 0 4px 0 0; }
-  .sidePanel h2 { margin-bottom: 8px; }
-  .sidePanel p { margin: 8px 0; }
-  .nextChapter { margin-top: 20px; }
-  .nextChapter h3 { margin: 8px 0; }
   .pageFooter { padding-top: 8px; margin: 0; gap: 24px; }
 }
 @media (max-width: 760px) {
@@ -108,9 +102,7 @@
   .gameGrid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .moneyPanel { padding: 0; } .money { margin: 8px 0; } .noteArea { min-height: 0; max-width: 360px; margin: auto; }
   .tapHint { margin: 8px 0 24px; } .sceneArt { max-width: 480px; margin: auto; }
-  .mobileShopToggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 16px 0; background: none; border: 0; border-block: 1px solid var(--rule); }
-  .shopContents { display: none; padding-top: 24px; } .shopExpanded .shopContents { display: block; } .nextChapter { margin-top: 32px; }
-  .mobilePhone { display: flex; align-items: center; gap: 12px; position: fixed; right: 20px; bottom: 20px; background: var(--accent); color: var(--accent-ink); padding: 12px 20px; border: 2px solid var(--canvas); border-radius: var(--radius); z-index: 10; min-height: 48px; }
-  .main { padding-bottom: 96px; } .pageFooter { gap: 16px; }
+  .main { padding-bottom: 20px; } .pageFooter { gap: 16px; }
+  .phonePanel { width: min(100%, 440px); height: auto; justify-self: center; scroll-margin-block: 16px; }
   .modalOverlay { padding: 16px; } .modal { padding: 24px; max-height: calc(100dvh - 32px); }
 }

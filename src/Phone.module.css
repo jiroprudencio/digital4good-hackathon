@@ -1,9 +1,8 @@
 /* Hallmark v2.0.0 | scope: app | phone investigation flow, browser-default type. */
 /* Critique: familiar app navigation; game decisions and provenance stay explicit. */
 /* User-directed iOS shell and app references override Hallmark's OS-chrome restriction. */
-.overlay { position: fixed; inset: 0; z-index: 30; background: var(--veil); display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 16px; gap: 12px; color: var(--ink); }
-.pauseRibbon { background: var(--surface); color: var(--ink); padding: 4px 16px; border-radius: var(--radius); }
-.phone { width: min(560px, 100%); height: min(850px, calc(100dvh - 100px)); background: var(--surface); border: var(--edge) solid var(--rule); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+.panel { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; font-family: var(--font-body); color: var(--ink); }
+.phone { width: 100%; height: 100%; min-height: 0; background: var(--surface); border: var(--edge) solid var(--rule); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
 .status { display: none; }
 .header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--rule); background: var(--surface-alt); }
 .header button { padding: 8px; display: grid; place-items: center; background: transparent; border: 0; min-width: 44px; min-height: 44px; border-radius: var(--radius); }
@@ -16,7 +15,6 @@
 .footer { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--rule); background: var(--surface-alt); }
 .footer button { background: none; border: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px; }
 .footer span { color: var(--muted); }
-.outsideHint { display: none; }
 .homeTitle { margin-bottom: 24px; }
 .homeTitle p { color: var(--muted); }
 .appGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 12px; margin-bottom: 32px; }
@@ -79,7 +77,7 @@
 .empty { display: grid; gap: 12px; margin: 24px 0; color: var(--muted); }
 .empty p { margin: 0; }
 .phone {
-  font-family: var(--font-body); color: var(--ink); width: min(470px, 100%);
+  font-family: var(--font-body); color: var(--ink); width: 100%;
   border: 7px solid var(--frame); border-radius: 42px; background: var(--surface);
 }
 .status { display: flex; align-items: center; justify-content: space-between; position: relative; min-height: 44px; padding: 8px 24px; background: var(--surface); }
@@ -135,7 +133,7 @@
 .footer button { color: var(--accent); }
 .footer .devExit { color: var(--muted); }
 .homeIndicator { width: 120px; height: 5px; border-radius: 5px; margin: 4px auto 8px; background: var(--ink); flex-shrink: 0; }
-.decisionDock { flex-shrink: 0; border-top: 3px solid var(--accent); background: var(--surface-alt); max-height: 48dvh; overflow-y: auto; padding: 12px 16px; box-shadow: 0 -4px 16px var(--rule); }
+.decisionDock { position: absolute; right: calc(100% + 24px); bottom: 24px; width: clamp(280px, 24dvi, 360px); max-height: min(620px, calc(100dvh - 80px)); overflow-y: auto; padding: 20px; background: var(--surface); border: 2px solid var(--accent); border-radius: 18px; box-shadow: 0 8px 32px var(--veil); }
 .decisionDock .decisions { margin: 0; padding: 0; border-radius: 0; background: transparent; }
 .decisionDock .decisions h3 { margin: 0 0 8px; }
 .decisionDock .primary { margin-top: 8px; font-weight: bold; border: 2px solid var(--accent); }
@@ -143,10 +141,23 @@
 .decisionDock .declineButton { background: var(--surface); color: var(--accent); border: 2px solid var(--accent); font-weight: bold; }
 .decisionDock .reportButton { background: var(--surface); color: var(--danger); border: 2px solid var(--danger); font-weight: bold; }
 .decisionDock .confirm { margin-top: 16px; padding-top: 12px; }
+.decisionDock .decisionSubject { margin: 0 0 12px; }
+.status { width: 100%; border: 0; color: var(--ink); text-align: left; touch-action: none; cursor: pointer; }
+.notificationButton { position: relative; justify-content: center; }
+.notificationBadge { position: absolute; right: 0; top: 0; min-width: 20px; border-radius: 20px; padding: 0 4px; background: var(--danger); color: var(--accent-ink); text-align: center; }
+.phone[data-app='notifications'] .content { background: var(--surface-alt); }
+.notificationCentre h2 { margin: 8px 0 24px; }
+.notificationCard { display: grid; width: 100%; gap: 8px; margin-bottom: 12px; padding: 16px; text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 20px; }
+.notificationApp { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.notificationApp small { margin-left: auto; }
+.status, .header, .footer, .phoneTabs { flex-shrink: 0; }
+@media (max-width: 760px) {
+  .panel { display: flex; flex-direction: column; height: auto; }
+  .phone { flex: 0 0 auto; height: auto; aspect-ratio: 78 / 163.4; }
+  .decisionDock { position: relative; right: auto; bottom: auto; width: 100%; max-height: none; flex-shrink: 0; margin-top: 16px; padding: 16px; }
+}
 @media (max-width: 600px) {
-  .overlay { padding: 0; gap: 0; }
-  .pauseRibbon { width: 100%; border-radius: 0; padding: 8px 16px; background: var(--surface-alt); }
-  .phone { width: 100%; height: 100%; min-height: 0; border-radius: 0; border: 0; }
+  .phone { border-radius: 28px; border-width: 4px; }
   .content { padding: 20px; }
   .footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
