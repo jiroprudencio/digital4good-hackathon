@@ -1,4 +1,4 @@
-export type PhoneApp = 'home' | 'messages' | 'mail' | 'calls' | 'contacts' | 'bank' | 'feedback';
+export type PhoneApp = 'home' | 'notifications' | 'messages' | 'mail' | 'calls' | 'contacts' | 'bank' | 'feedback';
 export type Decision = 'proceed' | 'decline' | 'report';
 export interface Evidence {
   id: string; app: PhoneApp; title: string; origin: string; body: string[]; call?: boolean;

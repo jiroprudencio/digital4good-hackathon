@@ -167,6 +167,97 @@ describe('automatic life stages', () => {
   });
 });
 
+describe('persistent phone browsing', () => {
+  it('persists an idle notification centre without pausing tap earnings', () => {
+    const s = reducer(start(), { type: 'APP', app: 'notifications' });
+    expect(s.phone).toMatchObject({ app: 'notifications', open: false, caseId: null, record: null });
+    const restored = decodeSave(JSON.stringify(s))!;
+    expect(restored.phone).toEqual(s.phone);
+    expect(tap(restored, 1).cash).toBe(s.cash + 2000);
+  });
+  it('keeps a pending notification centre paused across reloads and opens the selected request', () => {
+    let s = tap(start(), 5);
+    s = reducer(s, { type: 'APP', app: 'notifications' });
+    s = decodeSave(JSON.stringify(s))!;
+    expect(s.phone).toMatchObject({ app: 'notifications', open: true, caseId: 'school-a' });
+    expect(tap(s, 1)).toEqual(s);
+    s = reducer(s, { type: 'CASE', id: 'school-a' });
+    expect(s.phone).toMatchObject({ app: 'messages', open: true, caseId: 'school-a' });
+    expect(s.progress['school-a'].read).toBe(true);
+  });
+  it('resumes a developer-exited request on notification navigation without changing its evidence', () => {
+    let s = inspect(tap(start(), 5), 'market');
+    s = reducer(s, { type: 'DEV_EXIT' });
+    const progress = s.progress;
+    s = reducer(s, { type: 'APP', app: 'notifications' });
+    expect(s.phone.open).toBe(true); expect(s.progress).toEqual(progress);
+    expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
+  });
+  it('allows idle bank and app navigation without pausing earnings or time', () => {
+    let s = reducer(start(), { type: 'APP', app: 'bank' });
+    expect(s.phone).toMatchObject({ app: 'bank', open: false });
+    const cash = s.cash;
+    s = tap(s, 1);
+    expect(s.cash).toBe(cash + 2000); expect(s.phone.app).toBe('bank');
+    s = wait(s, 1); expect(s.activeMs).toBe(1000);
+    s = reducer(s, { type: 'BACK' });
+    expect(s.phone).toMatchObject({ app: 'home', open: false });
+    s = reducer(s, { type: 'APP', app: 'mail', list: true });
+    expect(s.phone).toMatchObject({ app: 'mail', record: 'list', open: false });
+    expect(decodeSave(JSON.stringify(s))?.phone).toEqual(s.phone);
+    expect(reducer(s, { type: 'PHONE', open: true }).phone.open).toBe(false);
+  });
+  it('lets idle browsing advance automatically when the stage gate is met', () => {
+    let s = { ...completedThrough(0), gross: 99000 };
+    s = reducer(s, { type: 'APP', app: 'bank' });
+    expect(tap(s, 1).stage).toBe(1);
+    s = { ...s, gross: 100000 };
+    expect(wait(s, 1).stage).toBe(1);
+  });
+  it('reviews archived evidence without pausing or granting retroactive verification', () => {
+    let s = completedThrough(0);
+    s = reducer(s, { type: 'CASE', id: 'school-a' });
+    expect(s.phone).toMatchObject({ caseId: 'school-a', app: 'messages', open: false });
+    s = inspect(s, 'market');
+    expect(s.phone).toMatchObject({ app: 'contacts', record: 'market', open: false });
+    expect(s.progress['school-a'].evidence).toEqual([]);
+    expect(s.progress['school-a'].result?.verified).toBe(false);
+    expect(tap(s, 1).cash).toBe(s.cash + 2000);
+  });
+  it.each(['APP', 'BACK', 'CASE', 'INSPECT'] as const)('%s re-engages a pending encounter after a development exit', action => {
+    let s = inspect(tap(start(), 5), 'market');
+    s = reducer(s, { type: 'DEV_EXIT' });
+    expect(s.phone.open).toBe(false);
+    s = reducer(s, action === 'APP' ? { type: action, app: 'bank' } : action === 'CASE' ? { type: action, id: 'school-a' } : action === 'INSPECT' ? { type: action, id: 'market' } : { type: action });
+    expect(s.phone.open).toBe(true);
+    expect(tap(s, 1)).toEqual(s);
+    expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
+    expect(reducer(s, { type: 'ACK' })).toEqual(s);
+    expect(s.progress['school-a'].result).toBeNull();
+  });
+  it('cannot bypass a pending request by navigating to an archived conversation', () => {
+    let s = tap(start(), 5);
+    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
+    s = reducer(s, { type: 'ACK' });
+    s = tap(s, 5);
+    s = reducer(s, { type: 'DEV_EXIT' });
+    s = reducer(s, { type: 'CASE', id: 'school-a' });
+    expect(s.phone.open).toBe(true); expect(activeCase(s)).toBe('school-b');
+    expect(tap(s, 1)).toEqual(s); expect(reducer(s, { type: 'ACK' })).toEqual(s);
+    s = reducer(s, { type: 'CASE', id: 'school-b' });
+    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
+    expect(s.progress['school-b'].result).not.toBeNull();
+  });
+  it('keeps outcome reading paused when moving between apps until Continue', () => {
+    let s = tap(start(), 5);
+    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
+    s = reducer(s, { type: 'APP', app: 'bank' });
+    expect(s.phone.open).toBe(true); expect(tap(s, 1)).toEqual(s);
+    s = reducer(s, { type: 'ACK' });
+    expect(s.phone.open).toBe(false); expect(tap(s, 1).cash).toBe(s.cash + 2000);
+  });
+});
+
 describe('development encounter exit', () => {
   it('preserves the request and evidence while allowing test earnings and upgrades', () => {
     let s = tap(start(), 5);

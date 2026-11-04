@@ -49,6 +49,8 @@ export const canAdvance = (s: GameState) => stageResolved(s) === 2 && (s.stage =
 export const unreadCount = (s: GameState) => Object.values(s.progress).filter(p => p.arrived && !p.read).length;
 export const activeCase = (s: GameState) => s.order[s.stage].find(id => s.progress[id].arrived && !s.progress[id].result);
 const canEarn = (s: GameState) => s.started && !s.phone.open && !s.hidden && !s.finished;
+// The phone is always visible; open tracks an encounter/outcome pause.
+const navigationPauses = (s: GameState) => s.phone.open || Boolean(activeCase(s));
 
 function advanceIfReady(s: GameState): GameState {
   if (!canEarn(s) || !canAdvance(s)) return s;
@@ -93,24 +95,24 @@ export function reducer(s: GameState, a: Action): GameState {
       if (!a.open && activeCase(s)) return s;
       const caseId = a.open && (!s.phone.caseId || s.progress[s.phone.caseId].result) ? activeCase(s) ?? s.phone.caseId : s.phone.caseId;
       const changed = caseId !== s.phone.caseId;
-      const next: GameState = { ...s, phone: { ...s.phone, open: a.open, caseId, app: changed ? 'home' : s.phone.app, record: changed ? null : s.phone.record } };
+      const next: GameState = { ...s, phone: { ...s.phone, open: a.open && navigationPauses(s), caseId, app: changed ? 'home' : s.phone.app, record: changed ? null : s.phone.record } };
       return a.open ? next : advanceIfReady(next);
     }
-    case 'APP': return s.phone.open ? { ...s, phone: { ...s.phone, app: a.app, record: a.list && (a.app === 'messages' || a.app === 'mail') ? 'list' : null } } : s;
+    case 'APP': return { ...s, phone: { ...s.phone, open: navigationPauses(s), app: a.app, record: a.list && (a.app === 'messages' || a.app === 'mail') ? 'list' : null } };
     case 'CASE': {
-      if (!s.phone.open || !s.progress[a.id]?.arrived) return s;
-      return { ...s, progress: { ...s.progress, [a.id]: { ...s.progress[a.id], read: true } }, phone: { open: true, app: CASES[a.id].channel, caseId: a.id, record: null } };
+      if (!s.progress[a.id]?.arrived) return s;
+      return { ...s, progress: { ...s.progress, [a.id]: { ...s.progress[a.id], read: true } }, phone: { open: navigationPauses(s), app: CASES[a.id].channel, caseId: a.id, record: null } };
     }
-    case 'BACK': return { ...s, phone: { ...s.phone, app: 'home', record: null } };
+    case 'BACK': return { ...s, phone: { ...s.phone, open: navigationPauses(s), app: 'home', record: null } };
     case 'INSPECT': {
       const id = s.phone.caseId;
-      if (!s.phone.open || !id || !s.progress[id].arrived) return s;
+      if (!id || !s.progress[id].arrived) return s;
       const e = CASES[id].evidence.find(e => e.id === a.id);
       if (!e || e.app !== s.phone.app) return s;
       const p = s.progress[id];
       const evidence = p.evidence.includes(e.id) || p.result ? p.evidence : [...p.evidence, e.id];
       const calls = e.call && !s.calls.some(c => c.caseId === id && c.evidenceId === e.id) ? [...s.calls, { caseId: id, evidenceId: e.id }] : s.calls;
-      return { ...s, progress: { ...s.progress, [id]: { ...p, evidence } }, calls, phone: { ...s.phone, record: e.id } };
+      return { ...s, progress: { ...s.progress, [id]: { ...p, evidence } }, calls, phone: { ...s.phone, open: navigationPauses(s), record: e.id } };
     }
     case 'SAMPLE': {
       const id = s.phone.caseId;
@@ -138,7 +140,7 @@ export function reducer(s: GameState, a: Action): GameState {
 export function decodeSave(raw: string): GameState | null {
   try {
     const s = JSON.parse(raw) as GameState;
-    const apps = ['home', 'messages', 'mail', 'calls', 'contacts', 'bank', 'browser', 'feedback'];
+    const apps = ['home', 'notifications', 'messages', 'mail', 'calls', 'contacts', 'bank', 'browser', 'feedback'];
     if (!s || s.version !== 1 || !Number.isInteger(s.stage) || s.stage < 0 || s.stage > 3) return null;
     for (const n of ['cash', 'gross', 'activeMs', 'stageMs', 'remainder'] as const) if (!Number.isSafeInteger(s[n]) || s[n] < 0) return null;
     if (s.remainder > 999 || typeof s.started !== 'boolean' || typeof s.upgrade !== 'boolean' || typeof s.finished !== 'boolean' || typeof s.reducedMotion !== 'boolean') return null;
