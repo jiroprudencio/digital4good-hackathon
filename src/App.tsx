@@ -30,12 +30,12 @@ export default function App() {
   function chooseFont(value: FontPairing) {
     setFont(value);
     const url = new URL(location.href); url.searchParams.set('font', value); history.replaceState(null, '', url);
-    if (!preview) try { localStorage.setItem('scamagotchi.font', value); } catch { /* Optional preference. */ }
+    if (!preview) try { localStorage.setItem('scamagotchi.font.v2', value); } catch { /* Optional preference. */ }
   }
   function chooseTheme(value: Theme) {
     setTheme(value);
     const url = new URL(location.href); url.searchParams.set('theme', value); history.replaceState(null, '', url);
-    if (!preview) try { localStorage.setItem('scamagotchi.theme', value); } catch { /* Optional preference. */ }
+    if (!preview) try { localStorage.setItem('scamagotchi.theme.v2', value); } catch { /* Optional preference. */ }
   }
   const [state, dispatch] = useReducer(reducer, initial.state);
   const [storageProblem, setStorageProblem] = useState(initial.problem);
@@ -109,13 +109,15 @@ export default function App() {
     <header className={styles.header}>
       <h1>Scamagotchi</h1>
       <nav className={styles.tools} aria-label="Game settings">
+        <button aria-label="Restart game" title="Restart game" onClick={() => setModal('reset')}><RotateCcw size={20} /> Restart</button>
+        <details className={styles.settings}><summary>Settings <ChevronDown size={16} /></summary><div className={styles.settingsPanel}>
         <label>Theme <select aria-label="Theme" value={theme} onChange={e => chooseTheme(e.target.value as Theme)}>{THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
         <a href="?view=themes" target={preview ? '_top' : undefined}>Compare themes</a>
-        <label>Fonts <select aria-label="Font pairing" value={font} onChange={e => chooseFont(e.target.value as FontPairing)}><option value="default">Browser default</option>{FONT_PAIRINGS.map(f => <option key={f.id} value={f.id}>{f.heading} + {f.body}</option>)}</select></label>
+        <label>Fonts <select aria-label="Font pairing" value={font} onChange={e => chooseFont(e.target.value as FontPairing)}>{FONT_PAIRINGS.map(f => <option key={f.id} value={f.id}>{f.heading} + {f.body}</option>)}</select></label>
         <a href="?view=fonts" target={preview ? '_top' : undefined}>Compare fonts</a>
         <button aria-label="How to play" title="How to play" onClick={() => setModal('about')}><Info size={20} /></button>
-        <button aria-label="Restart game" title="Restart game" onClick={() => setModal('reset')}><RotateCcw size={20} /> Restart</button>
         <label className={styles.motion}><input type="checkbox" checked={reduced} onChange={e => dispatch({ type: 'MOTION', reduced: e.target.checked })} /> Less motion</label>
+        </div></details>
       </nav>
     </header>
     {storageProblem && <div className={styles.storage} role="status"><p>{storageProblem}</p><button onClick={downloadSave}>Download backup</button>{recovering && <button onClick={() => setModal('reset')}>Start fresh</button>}</div>}
@@ -125,7 +127,7 @@ export default function App() {
         <section className={styles.moneyPanel} aria-label="Earn and save">
           <span>Balance</span><h2 className={styles.money}>SGD <span data-testid="balance">{money(state.cash)}</span></h2>
           <div className={styles.noteArea}>
-            <button className={styles.note} disabled={blocked} aria-label={`Earn ${money(rate.tap)} SGD. Tap the note.`} data-testid="earn" onClick={earn}><EarnNotes cents={rate.tap} /></button>
+            <button className={styles.note} disabled={blocked} aria-label={`Earn ${money(rate.tap)} SGD. Tap the note.`} data-testid="earn" onClick={earn}><EarnNotes cents={rate.tap} stage={state.stage} /></button>
             {floats.map(f => <span className={styles.floating} key={f.id} style={{ left: `${f.x}%` }}>{f.value}</span>)}
           </div>
           <p className={styles.tapHint}>{state.phone.open ? 'Paused' : `+SGD ${money(rate.tap)} per tap`}</p>

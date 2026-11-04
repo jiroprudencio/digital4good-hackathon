@@ -1,6 +1,27 @@
 import { expect, test } from '@playwright/test';
 import { CASES, ENCOUNTERS } from '../src/content';
 import { createGame, SAVE_KEY } from '../src/game';
+
+for (const viewport of [{ width: 3860, height: 2160 }, { width: 1930, height: 980 }, { width: 1280, height: 720 }]) {
+  test(`desktop fits ${viewport.width}x${viewport.height} with forty notes`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const s = createGame(() => 0);
+    s.started = true; s.stage = 2; s.upgrade = true; s.cash = 5000000;
+    for (const e of ENCOUNTERS.filter(e => e.stage < 2)) {
+      s.progress[e.id].arrived = true;
+      s.progress[e.id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: !e.scam };
+    }
+    await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: SAVE_KEY, value: JSON.stringify(s) });
+    await page.goto('/?theme=pocket&font=arcade');
+    await expect(page.getByTestId('stacked-note')).toHaveCount(40);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    for (const control of [page.getByTestId('earn'), page.getByRole('button', { name: 'Upgrade owned' }), page.getByRole('button', { name: /^Open phone/ }).first()]) {
+      await expect(control).toBeInViewport();
+    }
+    expect(await page.getByRole('list', { name: 'Life stages' }).locator('li').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain('Silkscreen');
+  });
+}
 import { FONT_PAIRINGS } from '../src/fonts';
 
 test('five taps force an encounter; investigate, reload and resolve before resuming', async ({ page }, testInfo) => {
@@ -86,9 +107,12 @@ for (const encounter of ENCOUNTERS) {
 test('loaded game stays playable offline and reduced motion persists', async ({ page, context }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start game' }).click();
+  await page.getByText('Settings', { exact: true }).click();
   await page.getByRole('checkbox', { name: 'Less motion' }).check();
   await page.reload();
+  await page.getByText('Settings', { exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Less motion' })).toBeChecked();
+  await page.getByText('Settings', { exact: true }).click();
   await context.setOffline(true);
   await page.getByTestId('earn').focus(); await page.keyboard.press('Enter');
   await page.getByRole('button', { name: /^Open phone/ }).first().click();
@@ -110,7 +134,9 @@ for (const theme of ['pocket', 'ledger', 'arcade', 'void', 'blueprint']) {
   test(`${theme} theme renders at the selected viewport without horizontal overflow`, async ({ page }, testInfo) => {
     await page.goto(`/?theme=${theme}`);
     await page.getByRole('button', { name: 'Start game' }).click();
+    await page.getByText('Settings', { exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Theme', exact: true })).toHaveValue(theme);
+    await page.getByText('Settings', { exact: true }).click();
     await expect(page.locator(`[data-theme="${theme}"]`)).toBeVisible();
     await expect(page.getByTestId('earn')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -93,10 +93,10 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
     if (!e || !p || p.result) return null;
     const affordable = s.cash >= e.cost * 100;
     return <section className={styles.decisions} aria-label="Make a decision">
-      <h3>Choose an action</h3><p>Use Apps to check other sources.</p>
+      <h3>Your decision</h3>
       <button className={styles.primary} disabled={!affordable} onClick={() => setConfirm('proceed')}>{e.proceed} {e.cost > 0 && <span>SGD {money(e.cost * 100)}</span>}</button>
       {!affordable && <p className={styles.hint}>You need SGD {money(e.cost * 100 - s.cash)} more. You can decline this request without paying.</p>}
-      <div className={styles.twoButtons}><button onClick={() => setConfirm('decline')}>{e.stage === 2 ? 'Hold for review' : 'Decline politely'}</button><button onClick={() => setConfirm('report')}>Report concern</button></div>
+      <div className={styles.twoButtons}><button className={styles.declineButton} onClick={() => setConfirm('decline')}>{e.stage === 2 ? 'Hold for review' : 'Decline politely'}</button><button className={styles.reportButton} onClick={() => setConfirm('report')}>Report concern</button></div>
       {confirm && <div className={styles.confirm} ref={confirmRef} role="group" aria-label="Confirm your decision">
         <strong>{confirm === 'proceed' ? 'Confirm this action?' : confirm === 'report' ? 'Report this request?' : 'Leave this request here?'}</strong>
         <p>{confirm === 'proceed' ? e.stage === 2 ? 'Submit 5,000 company units to the revised account. This uses employer funds, not your personal savings.' : e.cost ? `You authorise SGD ${money(e.cost * 100)} from your savings.` : 'Accept the role, complete a simulated shift and submit the hours for approval.' : confirm === 'report' ? 'This records your concern inside the game. No real report is sent.' : 'You can move on without making a payment. This choice ends the encounter.'}</p>
@@ -142,7 +142,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
     {e.id === 'uni-a' && !p.result && <button className={styles.evidenceButton} disabled={p.samplePaid} onClick={() => dispatch({ type: 'SAMPLE' })}><Wallet size={20} /><span><strong>{p.samplePaid ? 'Introductory task complete' : 'Try the introductory task'}</strong><small>{p.samplePaid ? 'SGD 50 received. You can open Bank to check.' : 'Complete one simulated task for SGD 50'}</small></span></button>}
     {e.evidence.filter(v => v.app === s.phone.app).map(evidenceButton)}
     {record && <EvidenceCard evidence={record} focusRef={openedRecord} />}
-    {p.result ? <button className={styles.primary} onClick={() => navigate('feedback')}>Read outcome</button> : decisionPanel()}
+    {p.result && <button className={styles.primary} onClick={() => navigate('feedback')}>Read outcome</button>}
     <details className={styles.conversationHistory}><summary>Other conversations</summary>{arrived.filter(c => c.channel === s.phone.app && c.id !== e.id).map(c => requestCard(c.id))}</details>
   </>;
   else body = <>
@@ -167,6 +167,7 @@ export default function Phone({ state: s, dispatch }: { state: GameState; dispat
         {isChat && inConversation ? <span className={styles.avatar}>{e?.initials}</span> : !pending ? <button aria-label="Close phone and resume earning" onClick={close}><X size={20} /></button> : <span className={styles.headerSpacer} />}
       </header>
       <div className={styles.content} data-conversation={inConversation || undefined} ref={content}>{body}</div>
+      {inConversation && p && !p.result && <div className={styles.decisionDock}>{decisionPanel()}</div>}
       {(s.phone.app === 'calls' || s.phone.app === 'contacts') && <nav className={styles.phoneTabs} aria-label="Phone sections"><button aria-current={s.phone.app === 'calls' ? 'page' : undefined} onClick={() => navigate('calls')}><PhoneCall size={21} />Recents</button><button aria-current={s.phone.app === 'contacts' ? 'page' : undefined} onClick={() => navigate('contacts')}><Users size={21} />Contacts</button></nav>}
       <footer className={styles.footer}><button aria-label={inConversation ? 'Phone home' : 'Open apps'} onClick={() => { setConfirm(null); dispatch({ type: 'BACK' }); }}><Home size={17} /> Apps</button>{pending ? import.meta.env.DEV ? <button className={styles.devExit} onClick={() => dispatch({ type: 'DEV_EXIT' })}>Exit request (dev) <X size={16} /></button> : <span>Resolve to continue</span> : <button onClick={close}>Close phone <X size={16} /></button>}</footer>
       <div className={styles.homeIndicator} aria-hidden="true" />

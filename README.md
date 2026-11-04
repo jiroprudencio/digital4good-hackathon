@@ -25,6 +25,7 @@ Deploy `dist/` to a static host when ready. There is no backend to deploy. The g
 ## Controls and progression
 
 - Click the SPECIMEN note or use Enter/Space while it is focused. Every activation counts: no cooldown, hold-repeat or idle income.
+- Notes use denominations of SGD 10, 50, 100 and 1,000 across the four stages. Each full note in a tap is drawn as a separate layer in the stack (base counts 2, 4, 20 and 10). The school item bonus leaves SGD 4 or SGD 8 in change, displayed separately so the total stays exact.
 - Buy one optional upgrade per chapter to double that chapter's earnings. The genuine school purchase adds a school-only 20% bonus.
 - The first request opens automatically after five accepted taps. The next opens after five additional taps following the first resolution.
 - A pending request blocks earning, upgrades and chapter advancement. Use the phone apps to investigate, make a decision and read the outcome. Escape cannot bypass an unresolved request. Declining remains available if a payment is unaffordable. Phone use and hidden tabs pause the clock.
@@ -52,9 +53,9 @@ Open `http://127.0.0.1:5173/?view=themes` for five live previews, or use **Theme
 
 ## Font comparisons and app references
 
-Open `http://127.0.0.1:5173/?view=fonts` to compare Nunito + DM Sans, Space Grotesk + Inter, Outfit + Source Sans 3, Pixelify Sans + Nunito Sans, and Silkscreen + IBM Plex Sans. Select a pairing in the header to apply it. All fonts are bundled locally under their included OFL licenses. `artifacts/font-pairings.png` is a standalone type specimen, not an application screenshot; reproduce it with `python scripts/render-font-pairings.py` (Pillow required).
+Pocket and Silkscreen + IBM Plex Sans are the defaults. Open `http://127.0.0.1:5173/?view=fonts` to compare Silkscreen with IBM Plex Sans, DM Sans, Inter, Nunito Sans and Source Sans 3. Select a pairing under Settings to apply it. Life-stage labels also use Silkscreen. All fonts are bundled locally under their included OFL licenses. `artifacts/silkscreen-pairings.png` is a standalone type specimen, not an application screenshot; reproduce it with `python scripts/render-font-pairings.py` (Pillow required).
 
-The desktop game fills the available width with three columns; smaller mobile viewports stack the controls. The phone uses system-style typography independently of the game's selected pairing.
+The desktop game fills the available viewport width and height with three columns. The main game page does not scroll on desktop; compact settings live in a dropdown, scenery scales to the remaining height, and the sidebar can scroll internally on unusually short windows. Target display: 3860 x 2160, including scaled laptop viewports. Smaller mobile viewports stack the controls. The phone uses system-style typography independently of the game's selected pairing.
 
 Phone references reviewed 4 November 2026:
 
@@ -62,7 +63,7 @@ Phone references reviewed 4 November 2026:
 - [Gmail for iOS](https://apps.apple.com/us/app/gmail-email-by-google/id422689480): rounded search, inbox rows, sender details and plain mail reading surfaces.
 - [Apple's Phone guide](https://support.apple.com/en-ae/guide/iphone/iph3c993cbc/ios): Recents, Contacts, separate incoming/outgoing records and saved-contact routes.
 
-These are simulated app-inspired screens, not embedded clients or pixel-certified replicas. Game decisions remain visible below messages. Browser has been removed; marketplace checks use saved support contacts and campus records appear in Mail. Old saves migrate to those routes without losing history.
+These are simulated app-inspired screens, not embedded clients or pixel-certified replicas. Game decisions stay in a distinct panel below the scrolling conversation, with a solid primary action, an outlined decline button and a red-outlined report button. Browser has been removed; marketplace checks use saved support contacts and campus records appear in Mail. Old saves migrate to those routes without losing history.
 
 ## Content and learning design
 
