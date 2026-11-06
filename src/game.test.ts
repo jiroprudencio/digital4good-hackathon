@@ -39,7 +39,7 @@ function roundTrip(s: GameState): GameState {
   expect(loaded).not.toBeNull();
   return loaded!;
 }
-function run(strategy: 'cautious' | 'mistakes' | 'decline'): GameState {
+function run(strategy: 'cautious' | 'mistakes' | 'decline', purchaseUpgrades = false): GameState {
   let s = ready();
   for (let i = 0; i < 20000 && !s.finished; i++) {
     if (s.briefing) s = reducer(s, { type: 'BEGIN_STAGE' });
@@ -51,7 +51,8 @@ function run(strategy: 'cautious' | 'mistakes' | 'decline'): GameState {
       if (strategy === 'cautious') s = inspect(s);
       s = reducer(s, { type: 'RESOLVE', decision: strategy === 'decline' || (strategy === 'cautious' && e.scam) ? 'decline' : 'proceed' });
       s = roundTrip(s);
-    } else s = tap(tick(s, 1000));
+    } else if (purchaseUpgrades && !s.upgrade && s.cash >= STAGES[s.stage].cost * 100) s = reducer(s, { type: 'UPGRADE' });
+    else s = tap(tick(s, 1000));
   }
   return s;
 }
@@ -381,6 +382,16 @@ describe('calls and persisted investigation', () => {
 });
 
 describe('complete journey and endless play', () => {
+  it.each(['cautious', 'mistakes', 'decline'] as const)('%s run can buy every stage upgrade without a money or progression trap', strategy => {
+    const s = roundTrip(run(strategy, true));
+    expect(s.finished).toBe(true);
+    expect(resolvedCount(s)).toBe(ENCOUNTERS.length);
+    expect(s.ledger.filter(entry => entry.id.startsWith('upgrade-')).map(entry => entry.stage)).toEqual([0, 1, 2, 3]);
+    expect(s.cash).toBe(s.gross + s.ledger.reduce((sum, entry) => sum + entry.cents, 0));
+    const continued = tap(reducer(s, { type: 'CONTINUE_PLAY' }));
+    expect(continued.cash - s.cash).toBe(20000);
+    expect(continued.finished).toBe(false);
+  });
   it.each(['cautious', 'mistakes', 'decline'] as const)('%s run can finish all stages and continue past a million', strategy => {
     let s = run(strategy);
     expect(s.finished).toBe(true);

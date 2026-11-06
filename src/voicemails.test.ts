@@ -10,7 +10,7 @@ import manifest from './generated/voicemail-audio.json';
 describe('bundled voicemail recordings', () => {
   const cases = ENCOUNTERS.filter(encounter => encounter.channel === 'calls');
   it('voices every call with the selected voice, including the genuine request', () => {
-    expect(manifest.voice).toEqual({ id: 'i9SZdx1xJqqryIiaFdmN', name: 'Kopi Gao - Expressive Singlish' });
+    expect(manifest.voice).toEqual({ id: 'Z2vRYxPj8kxx56IA3Ie9', name: 'SG Accent' });
     expect(cases.some(encounter => !encounter.scam)).toBe(true);
     expect(Object.keys(manifest.clips).sort()).toEqual(cases.map(encounter => encounter.id).sort());
   });
@@ -18,7 +18,7 @@ describe('bundled voicemail recordings', () => {
     const recording = getVoicemailAudio(encounter.id);
     expect(recording).toBeDefined();
     expect(recording!.text).toBe(VOICEMAIL_SCRIPTS[encounter.id]);
-    expect(recording!.text).not.toMatch(/\{name\}|^(Caller|Ravi):|S\$/m);
+    expect(recording!.text).not.toMatch(/\{name\}|Mr\/Mrs|^(Caller|Ravi):|S\$/m);
     const info = manifest.clips[encounter.id as keyof typeof manifest.clips];
     const audio = readFileSync(resolve('public', recording!.src.slice(1)));
     expect(audio.length).toBe(info.bytes);

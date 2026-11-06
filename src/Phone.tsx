@@ -13,9 +13,12 @@ import styles from './Phone.module.css';
 
 export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: () => void, enabled = true, lockScroll = true) {
   const closeRef = useRef(close); closeRef.current = close;
+  // Capture the opener before React makes its surrounding content inert.
+  // The effect retains this render's value until the dialog closes.
+  const focusBeforeCommit = typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null;
   useEffect(() => {
     if (!enabled) return;
-    const before = document.activeElement as HTMLElement | null, root = ref.current;
+    const before = focusBeforeCommit, root = ref.current;
     const oldOverflow = document.body.style.overflow;
     if (lockScroll) document.body.style.overflow = 'hidden';
     (root?.querySelector<HTMLElement>('[data-dialog-focus]') ?? root?.querySelector<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select, summary, [tabindex="0"]'))?.focus();
@@ -24,7 +27,7 @@ export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: 
       if (event.key !== 'Tab' || !root) return;
       const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select, summary, [tabindex="0"]')].filter(el => el.getClientRects().length > 0);
       const first = items[0], last = items[items.length - 1]; if (!first) return;
-      if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      if (event.shiftKey && (document.activeElement === first || !items.includes(document.activeElement as HTMLElement))) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', key);
@@ -42,6 +45,7 @@ type Contact = (typeof STAGE_PROFILES)[number]['contacts'][number];
 export default function Phone({ state: s, dispatch, spotlight }: { state: GameState; dispatch: Dispatch<Action>; spotlight: boolean }) {
   const ref = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null), swipeStart = useRef<number | null>(null);
+  const replyRef = useRef<HTMLElement>(null), replyReturn = useRef<HTMLButtonElement | null>(null);
   const [confirm, setConfirm] = useState<Decision | null>(null), [query, setQuery] = useState('');
   const [senderOpen, setSenderOpen] = useState(false), [contactId, setContactId] = useState<string | null>(null);
   const [contactCall, setContactCall] = useState(false), [replyOpen, setReplyOpen] = useState(false);
@@ -89,6 +93,13 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
     confirmRef.current?.scrollIntoView({ block: 'nearest' });
     confirmRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
   }, [confirm]);
+  useEffect(() => {
+    if (!replyOpen) return;
+    replyRef.current?.scrollIntoView({ block: 'nearest' });
+    replyRef.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  }, [replyOpen]);
+  const toggleReply = (button: HTMLButtonElement) => { replyReturn.current = button; setReplyOpen(!replyOpen); };
+  const closeReply = () => { setReplyOpen(false); replyReturn.current?.focus(); };
   const rememberScroll = () => { if (content.current) scrollPositions.current.set(locationKey, content.current.scrollTop); };
   const navigate = (app: PhoneApp, list = false) => { rememberScroll(); setConfirm(null); dispatch({ type: 'APP', app, list }); };
   const select = (caseId: string) => { rememberScroll(); setConfirm(null); dispatch({ type: 'CASE', id: caseId }); };
@@ -188,7 +199,6 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
     return <div className={styles.callScreen}>
       <span className={styles.callerPortrait}><Users size={56} /></span><h2>{t(e.sender)}</h2><p>{incoming ? 'Incoming call' : 'Call in progress'}</p>
       {liveCall && <VoicemailAudio key={locationKey} caseId={e.id} transcript={(e.callTranscript ?? e.messages).map(t)} dark paused={!s.phone.open} />}
-      <div className={styles.callButtons}>{incoming ? <><button aria-label="Decline call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>Decline</button><button aria-label="Accept call" onClick={() => dispatch({ type: 'CALL_ANSWER' })}><span className={styles.acceptCall}><PhoneCall size={28} /></span>Accept</button></> : <button aria-label="End call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>End call</button>}</div>
     </div>;
   }
   let body: ReactNode;
@@ -225,20 +235,28 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
       {e.channel === 'calls' && p.callStatus === 'declined' && <VoicemailAudio key={locationKey} caseId={e.id} transcript={(e.callTranscript ?? e.messages).map(t)} collapsed paused={Boolean(pending && !s.phone.open)} />}
       {replies.filter(v => !/reply|reassur|sender|profile/i.test(v.id) && !/Earlier|Archived|Original|Existing/i.test(v.origin)).map(evidenceRow)}
       {record && record.app === s.phone.app && recordCard(record)}
-      {replyOpen && <section className={styles.replySheet}><h3>Reply to {t(e.sender)}</h3>{replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).length ? replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).map(v => <button className={styles.replyOption} key={v.id} onClick={() => { inspect(v); setReplyOpen(false); }}>Could you confirm the details? <Send size={16} /></button>) : <p>This conversation contains all the details provided so far. Your phone’s other apps are available from the home bar.</p>}<button className={styles.textButton} onClick={() => setReplyOpen(false)}>Close</button></section>}
+      {replyOpen && <section className={styles.replySheet} ref={replyRef}><h3>Reply to {t(e.sender)}</h3>{replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).length ? replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).map(v => <button className={styles.replyOption} key={v.id} onClick={() => { inspect(v); setReplyOpen(false); }}>Could you confirm the details? <Send size={16} /></button>) : <p>This conversation contains all the details provided so far. Your phone’s other apps are available from the home bar.</p>}<button className={styles.textButton} onClick={closeReply}>Close</button></section>}
       {p.result && <button className={styles.textButton} onClick={() => navigate('feedback')}>Read outcome <ChevronRight size={16} /></button>}
-      {isMail && <div className={styles.mailReplies}><button onClick={() => setReplyOpen(!replyOpen)}><ArrowLeft size={18} /> Reply</button></div>}
+      {isMail && <div className={styles.mailReplies}><button onClick={event => toggleReply(event.currentTarget)}><ArrowLeft size={18} /> Reply</button></div>}
     </>;
   } else body = <Empty icon={<Smartphone />} text="Your phone is ready" />;
   const title = s.phone.app === 'profile' ? 'My Card' : s.phone.app === 'feedback' ? 'Outcome' : s.phone.app === 'notifications' ? '' : inConversation && isChat && e ? t(e.sender) : apps.find(app => app.id === s.phone.app)?.name ?? '';
   const contactsBack = s.phone.app === 'profile' || (s.phone.app === 'contacts' && !!selectedContact);
-  return <div className={styles.panel} data-testid="phone" data-theme="ios" ref={ref} role={spotlight ? 'dialog' : 'region'} aria-modal={spotlight || undefined} aria-label="Your simulated phone">
+  return <div className={styles.panel} data-testid="phone" data-theme="ios" ref={ref} role={spotlight ? 'dialog' : 'region'} aria-modal={spotlight || undefined} aria-label="Your simulated phone" onKeyDown={event => {
+    if (event.key === 'Escape' && headerMenu) {
+      event.preventDefault(); event.stopPropagation(); setHeaderMenu(false);
+      ref.current?.querySelector<HTMLButtonElement>('[aria-label="More phone options"]')?.focus();
+    } else if (event.key === 'Escape' && replyOpen) {
+      event.preventDefault(); event.stopPropagation(); closeReply();
+    }
+  }}>
     <div className={styles.phone} style={{ '--wallpaper': "url('/art/iphone-wallpaper.jpg')" } as CSSProperties} data-app={s.phone.app} data-call={incoming || liveCall || undefined}>
       <button className={styles.status} aria-label="Open notification centre from top bar" title="Notifications (swipe down)" onClick={() => navigate('notifications')} onPointerDown={ev => { swipeStart.current = ev.clientY; ev.currentTarget.setPointerCapture(ev.pointerId); }} onPointerUp={ev => { if (swipeStart.current !== null && ev.clientY - swipeStart.current > 28) navigate('notifications'); swipeStart.current = null; }} onPointerCancel={() => { swipeStart.current = null; }}><strong>9:41</strong><span className={styles.camera} /><span><Signal size={14} /><Wifi size={14} /><BatteryFull size={19} /></span></button>
       {!incoming && !liveCall && <header className={styles.header}><button aria-label={contactsBack ? 'Back to contacts' : inConversation || archivedRecord ? isMail ? 'Back to inbox' : 'Back to chats' : 'Phone home'} onClick={() => contactsBack ? backToContacts() : inConversation || archivedRecord ? navigate(s.phone.app, true) : navigate('home')}><ChevronLeft size={23} />{contactsBack ? <span>Contacts</span> : inConversation && isChat && <span>Chats</span>}</button><span className={styles.headerTitle}>{inConversation && isChat && <span className={styles.smallAvatar}>{e?.initials}</span>}<strong>{contactsBack && selectedContact ? '' : title}</strong></span><button aria-label="More phone options" aria-expanded={headerMenu} onClick={() => setHeaderMenu(!headerMenu)}><MoreHorizontal size={22} /></button></header>}
       {headerMenu && <div className={styles.headerMenu}><button onClick={() => navigate('notifications')}><Bell size={17} />Notifications</button><button onClick={() => navigate('profile')}><Users size={17} />My Card</button><button onClick={() => navigate('home')}><Home size={17} />Home</button></div>}
       <div className={styles.content} data-conversation={inConversation || undefined} ref={content} onScroll={rememberScroll}>{body}</div>
-      {inConversation && isChat && <div className={styles.composer}><button aria-label="Reply to message" onClick={() => setReplyOpen(!replyOpen)}><span>Message</span><Send size={19} /></button></div>}
+      {(incoming || liveCall) && <div className={styles.callButtons}>{incoming ? <><button aria-label="Decline call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>Decline</button><button aria-label="Accept call" onClick={() => dispatch({ type: 'CALL_ANSWER' })}><span className={styles.acceptCall}><PhoneCall size={28} /></span>Accept</button></> : <button aria-label="End call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>End call</button>}</div>}
+      {inConversation && isChat && <div className={styles.composer}><button aria-label="Reply to message" onClick={event => toggleReply(event.currentTarget)}><span>Message</span><Send size={19} /></button></div>}
       {(s.phone.app === 'calls' || s.phone.app === 'contacts') && !incoming && !liveCall && <nav className={styles.phoneTabs} aria-label="Phone sections"><button aria-current={s.phone.app === 'calls' ? 'page' : undefined} onClick={() => navigate('calls')}><PhoneCall size={20} />Recents</button><button aria-current={s.phone.app === 'contacts' ? 'page' : undefined} onClick={() => navigate('contacts')}><Users size={20} />Contacts</button></nav>}
       {import.meta.env.DEV && pending && s.phone.open && <button className={styles.devExit} onClick={() => dispatch({ type: 'DEV_EXIT' })}>Exit request (dev) <X size={13} /></button>}
       {!s.phone.open && pending && <button className={styles.resumeRequest} onClick={returnToRequest}>Resume request</button>}

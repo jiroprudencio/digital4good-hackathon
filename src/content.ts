@@ -657,9 +657,9 @@ export const ENCOUNTERS: EncounterVariant[] = [
       "Keep your funds available while we send further instructions."
     ],
     "callTranscript": [
-      "Caller: Hello {name}. I am calling about suspected misuse of an account linked to your identity.",
+      "Caller: Hello Mr/Mrs {name}. I'm calling about suspected misuse of an account linked to your identity.",
       "Caller: This matter is confidential while we investigate. Please do not discuss it with others yet.",
-      "Caller: Move S$20,000 to the account we provide so the funds can be checked. You will get it back once the review is complete."
+      "Caller: Move 20,000 dollars to the account we provide so the funds can be checked. You will get it back once the review is complete."
     ],
     "followUp": [
       "Following our call: please transfer S$20,000 to the account provided for the investigation.",
@@ -720,9 +720,9 @@ export const ENCOUNTERS: EncounterVariant[] = [
       "Can help me with a short loan? I will explain."
     ],
     "callTranscript": [
-      "Caller: Eh {name}, you recognise my voice? We meet for coffee one.",
-      "Caller: Yes, Ravi lah. My old phone stopped working, so save this number.",
-      "Caller: My banking app is not working. Can lend me S$10,000 first? I will return it tomorrow. I will send the account details."
+      "Caller: Eh hi, this is Ravi, you recognise my voice or not? We meet for coffee one.",
+      "Caller: My old phone stopped working, so save this number ah.",
+      "Caller: My banking app is not working. Can lend me 10,000 dollars first? I will return it tomorrow confirm. I can send the account details."
     ],
     "followUp": [
       "It is Ravi — the number I called from just now.",
@@ -793,7 +793,7 @@ export const ENCOUNTERS: EncounterVariant[] = [
     ],
     "callTranscript": [
       "Ravi: Hi {name}, free to talk? It is about the community class we discussed at coffee.",
-      "Ravi: I can book the group places. Your contribution is S$200.",
+      "Ravi: I can book the group places. Your contribution is 200 dollars.",
       "Ravi: Check the details and call me back when convenient. No problem if you decide not to join."
     ],
     "followUp": [

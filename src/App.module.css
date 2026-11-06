@@ -69,4 +69,4 @@
 @media(prefers-reduced-motion:reduce){.app *{animation:none!important;transition:none!important}}
 
 @media(max-width:760px){.creatorFields{border-left:0;padding-left:0}}
-@media(max-width:480px){.brand{flex-basis:100%;justify-content:center}.headerTools{width:100%;margin-left:0;justify-content:center}.chapters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.chapters li{min-width:0}}
+@media(max-width:480px){.brand{flex-basis:100%;justify-content:center}.brand h1{font-size:clamp(20px,6vw,28px);white-space:nowrap}.headerTools{position:relative;width:100%;margin-left:0;justify-content:center}.settings{position:static}.settingsPanel{max-width:100%}.chapters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.chapters li{min-width:0}}

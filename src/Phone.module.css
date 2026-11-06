@@ -133,7 +133,7 @@
 .transcript { background:#ffffff14; border:1px solid #ffffff12; border-radius:16px; text-align:left; padding:14px; margin:22px 0; width:100%; }
 .transcript > small { color:#c6c7cd; }
 .transcript p { margin:10px 0; line-height:1.5; }
-.callButtons { display:flex; justify-content:space-around; width:100%; gap:18px; margin-top:auto; padding-top:30px; }
+.callButtons { display:flex; flex-shrink:0; justify-content:space-around; width:100%; gap:18px; padding:10px 16px 6px; background:#292a2e; }
 .callButtons button { display:flex; align-items:center; flex-direction:column; gap:9px; min-width:76px; padding:6px; color:#fff; border:0; background:transparent; }
 .callButtons button span { width:62px; height:62px; display:grid; place-items:center; border-radius:50%; }
 .endCall { background:#ed453e; }

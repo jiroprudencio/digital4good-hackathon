@@ -7,8 +7,8 @@ export const VOICEMAIL_SCRIPTS: Record<string, string> = Object.fromEntries(
     encounter.id,
     (encounter.callTranscript ?? encounter.messages).map(line => line
       .replace(/^[^:]+:\s*/, '')
-      .replace(/\s*\{name\}/g, '')
-      .replace(/S\$([\d,]+)/g, '$1 Singapore dollars')
+      .replace(/\s*(?:Mr\/Mrs\s+)?\{name\}/g, '')
+      .replace(/S\$([\d,]+)/g, '$1 dollars')
       .trim()).join('\n\n'),
   ]),
 );

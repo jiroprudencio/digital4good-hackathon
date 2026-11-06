@@ -1,21 +1,28 @@
 {
+  "voice": {
+    "id": "Z2vRYxPj8kxx56IA3Ie9",
+    "name": "SG Accent"
+  },
   "results": [
     {
       "id": "home-a",
-      "durationSeconds": 21.36,
+      "durationSeconds": 15.56,
       "played": true,
+      "playbackRate": 1.25,
       "readyState": 4
     },
     {
       "id": "home-b",
-      "durationSeconds": 17.88,
+      "durationSeconds": 13.56,
       "played": true,
+      "playbackRate": 1.25,
       "readyState": 4
     },
     {
       "id": "home-c",
-      "durationSeconds": 16.53,
+      "durationSeconds": 12.45,
       "played": true,
+      "playbackRate": 1.25,
       "readyState": 4
     }
   ],
