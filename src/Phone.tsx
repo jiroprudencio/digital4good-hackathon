@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, ReactNode } from 'react';
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, BatteryFull, Bell, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileText, Home, Mail, MessageCircle, MoreHorizontal, PhoneCall, PhoneOff, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, BatteryFull, Bell, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileText, Flag, Home, Mail, MessageCircle, MoreHorizontal, PhoneCall, PhoneOff, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
 import { CASES, money, STAGES, personalise } from './content';
 import type { Decision, Evidence, PhoneApp } from './content';
 import type { Action, GameState } from './game';
@@ -166,13 +166,13 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
       <h3>{t(e.sender)}’s request</h3>
       <button className={styles.primary} disabled={!affordable} onClick={() => setConfirm('proceed')}>{t(e.proceed)}{e.cost > 0 && !/S\$|\bSGD\b/.test(e.proceed) && <small>S${money(e.cost * 100)}</small>}</button>
       {!affordable && <p className={styles.hint}>You need S${money(e.cost * 100 - s.cash)} more. You can decline without paying.</p>}
-      <button className={styles.secondary} onClick={() => setConfirm('decline')}>Decline request</button>
-      <button className={styles.secondary} onClick={() => { setConfirm(null); navigate('home'); }}>Keep investigating</button>
-      <button className={styles.report} onClick={() => setConfirm('report')}>Report concern</button>
+      <button className={styles.danger} onClick={() => setConfirm('decline')}><X size={18} aria-hidden="true" /> Decline request</button>
+      <button className={styles.secondary} onClick={() => { setConfirm(null); navigate('home'); }}><Search size={18} aria-hidden="true" /> Keep investigating</button>
+      <button className={styles.report} onClick={() => setConfirm('report')}><Flag size={18} aria-hidden="true" /> Report concern</button>
       {confirm && <div className={styles.confirm} ref={confirmRef} role="group" aria-label="Confirm your decision">
         <strong>{confirm === 'proceed' ? 'Confirm this action?' : confirm === 'report' ? 'Report this request?' : 'Decline this request?'}</strong>
         <p>{confirm === 'proceed' ? t(e.confirmText) : confirm === 'report' ? 'This records your concern in the game. No real report is sent.' : 'This ends the encounter without accepting the request.'}</p>
-        <div className={styles.confirmActions}><button className={styles.secondary} onClick={() => setConfirm(null)}>Cancel</button><button className={styles.primary} onClick={() => { dispatch({ type: 'RESOLVE', decision: confirm }); setConfirm(null); }}>Confirm {confirm === 'proceed' ? 'action' : 'decision'}</button></div>
+        <div className={styles.confirmActions}><button className={styles.secondary} onClick={() => setConfirm(null)}>Cancel</button><button className={confirm === 'decline' ? styles.dangerConfirm : styles.primary} onClick={() => { dispatch({ type: 'RESOLVE', decision: confirm }); setConfirm(null); }}>Confirm {confirm === 'proceed' ? 'action' : 'decision'}</button></div>
       </div>}
       {!confirm && <small className={styles.investigationHint}>You can still use your phone.</small>}
     </section>;

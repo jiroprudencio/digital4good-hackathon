@@ -152,12 +152,14 @@
 .decisionDock { position:absolute; right:calc(100% + 20px); bottom:28px; width:clamp(270px,23vw,360px); max-height:calc(100dvh - 130px); overflow:auto; overscroll-behavior:contain; border:2px solid #abae91; border-radius:20px; padding:22px; background:#fffdf0; color:#252a23; box-shadow:0 8px 32px #0003; font-family:var(--font-body); }
 .decisionDock h3 { margin:0 0 20px; font-family:'Silkscreen',monospace; overflow-wrap:anywhere; }
 .decisionDock button { font:inherit; cursor:pointer; }
-.primary,.secondary { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; min-height:48px; width:100%; padding:12px 15px; border:1px solid #a6a88a; border-radius:13px; background:#eed34f; color:#27291c; font-weight:600; text-align:center; margin-top:12px; }
+.primary,.secondary,.danger,.dangerConfirm { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; min-height:48px; width:100%; padding:12px 15px; border:1px solid #a6a88a; border-radius:13px; background:#eed34f; color:#27291c; font-weight:600; text-align:center; margin-top:12px; }
 .primary:active:not(:disabled),.secondary:active:not(:disabled) { transform:translateY(1px); }
 .primary:disabled { opacity:.5; cursor:not-allowed; }
 .primary small { display:block; width:100%; font-weight:normal; }
-.secondary { background:#fffdf4; }
-.report { display:block; min-height:40px; padding:8px; margin:8px auto 0; color:#676b5a; border:0; background:none; text-decoration:underline; text-underline-offset:3px; }
+.secondary { background:#f2f3f4; color:#303940; border-color:#a7afb7; }
+.danger { background:#fff6f5; color:#a52528; border-color:#ae3436; }
+.dangerConfirm { background:#a52528; color:#fff; border-color:#a52528; }
+.report { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px; padding:12px 15px; margin:12px 0 0; color:#fff; border:1px solid #155b99; border-radius:13px; background:#155b99; font-weight:600; }
 .confirm { margin-top:16px; padding-top:16px; border-top:1px solid #c8c9b2; }
 .confirm p { line-height:1.5; }
 .confirmActions { display:flex; gap:8px; }
