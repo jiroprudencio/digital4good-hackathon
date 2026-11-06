@@ -5,3 +5,8 @@ playwright-report/
 *.log
 *.tsbuildinfo
 .DS_Store
+# Local secrets written by `elevenlabs onboard`
+/.env.local
+.env
+.env.*
+!.env.example

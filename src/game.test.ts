@@ -1,469 +1,439 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { CASES, ENCOUNTERS, STAGES } from './content';
-import { activeCase, canAdvance, createGame, decodeSave, rates, reducer, resolvedCount } from './game';
-import type { GameState } from './game';
+import { activeCase, canAdvance, createGame, decodeSave, encounterChannel, EVENT_COOLDOWN_MS, rates, reducer, resolvedCount, SAVE_KEY, stageResolved } from './game';
+import type { GameState, EncounterResult } from './game';
+import { DEFAULT_CHARACTER, normaliseCharacter, SKIN_TONES } from './profiles';
 
-function wait(s: GameState, seconds: number) {
-  for (let i = 0; i < seconds; i++) s = reducer(s, { type: 'TICK', ms: 1000 });
+function ready() {
+  return reducer(reducer(createGame(() => .99), { type: 'START', character: { name: '  Nur Aisha  ', gender: 'woman', skinTone: 5 } }), { type: 'BEGIN_STAGE' });
+}
+// Scheduling tests isolate tap and timer gates from encounter affordability.
+function funded() { return { ...ready(), cash: 50000 }; }
+function tap(s: GameState, count = 1): GameState {
+  for (let i = 0; i < count; i++) s = reducer(s, { type: 'TAP', now: i });
   return s;
 }
-function tap(s: GameState, count: number) {
-  for (let i = 0; i < count; i++) s = reducer(s, { type: 'TAP', now: Math.max(0, s.lastTap + 500) });
+function tick(s: GameState, ms: number): GameState {
+  for (let remaining = ms; remaining > 0; remaining -= 1000) s = reducer(s, { type: 'TICK', ms: Math.min(1000, remaining) });
   return s;
 }
-function start() { return reducer(createGame(() => 0), { type: 'START' }); }
-function open(s: GameState, id: string) {
-  s = reducer(s, { type: 'PHONE', open: true });
-  return reducer(s, { type: 'CASE', id });
+function selected(id: string): GameState {
+  const s = ready(), e = CASES[id];
+  s.stage = e.stage;
+  s.cash = 50000000;
+  s.gross = STAGES[Math.max(0, e.stage - 1)].gate * 100;
+  for (const old of ENCOUNTERS.filter(c => c.stage < e.stage)) {
+    s.progress[old.id] = { arrived: true, read: true, evidence: [], samplePaid: false, callStatus: old.channel === 'calls' ? 'answered' : null, result: { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: !old.scam && old.stage !== 3, inspectedEvidence: [] } };
+  }
+  s.progress[id] = { ...s.progress[id], arrived: true, read: true, callStatus: e.channel === 'calls' ? 'ringing' : null };
+  s.phone = { open: true, app: e.channel, caseId: id, record: null };
+  return s;
 }
-function inspect(s: GameState, id: string) {
-  const e = CASES[s.phone.caseId!].evidence.find(e => e.id === id)!;
-  s = reducer(s, { type: 'APP', app: e.app });
-  return reducer(s, { type: 'INSPECT', id });
+function inspect(s: GameState, evidenceId = 'independent') {
+  const e = CASES[s.phone.caseId!].evidence.find(x => x.id === evidenceId)!;
+  return reducer(reducer(s, { type: 'APP', app: e.app }), { type: 'INSPECT', id: e.id });
 }
-function fixture(id: string, cash = 5000000) {
-  const s = start(); s.stage = CASES[id].stage; s.cash = cash; s.progress[id].arrived = true;
-  return open(s, id);
+function answer(s: GameState) { return s.progress[s.phone.caseId!].callStatus === 'ringing' ? reducer(s, { type: 'CALL_ANSWER' }) : s; }
+function roundTrip(s: GameState): GameState {
+  const loaded = decodeSave(JSON.stringify(s));
+  expect(loaded).not.toBeNull();
+  return loaded!;
 }
-function completedThrough(stage: number) {
-  const s = start(); s.stage = stage;
-  for (const e of ENCOUNTERS.filter(e => e.stage <= stage)) {
-    s.progress[e.id] = { ...s.progress[e.id], arrived: true, read: true, result: { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: !e.scam && e.stage !== 3 } };
+function run(strategy: 'cautious' | 'mistakes' | 'decline'): GameState {
+  let s = ready();
+  for (let i = 0; i < 20000 && !s.finished; i++) {
+    if (s.briefing) s = reducer(s, { type: 'BEGIN_STAGE' });
+    else if (s.phone.app === 'feedback') s = reducer(s, { type: 'ACK' });
+    else if (activeCase(s)) {
+      const id = activeCase(s)!, e = CASES[id];
+      s = reducer(s, { type: 'CASE', id });
+      s = answer(s);
+      if (strategy === 'cautious') s = inspect(s);
+      s = reducer(s, { type: 'RESOLVE', decision: strategy === 'decline' || (strategy === 'cautious' && e.scam) ? 'decline' : 'proceed' });
+      s = roundTrip(s);
+    } else s = tap(tick(s, 1000));
   }
   return s;
 }
 
-describe('earning and chapter pacing', () => {
-  it('auto-opens after five accepted taps, never from elapsed time', () => {
-    let s = wait(start(), 60);
+describe('character and briefing lifecycle', () => {
+  it('starts at character creation and pauses at each briefing', () => {
+    const fresh = createGame();
+    expect(fresh.started).toBe(false);
+    expect(tap(fresh)).toEqual(fresh);
+    const named = reducer(fresh, { type: 'START', character: { name: ' Mei ', gender: 'woman', skinTone: 4 } });
+    expect(named.character).toEqual({ name: 'Mei', gender: 'woman', skinTone: 4 });
+    expect(named.briefing).toBe(true);
+    expect(tap(named)).toEqual(named);
+    expect(reducer(named, { type: 'TICK', ms: 900 })).toEqual(named);
+    const begun = reducer(named, { type: 'BEGIN_STAGE' });
+    expect(tap(begun).cash).toBe(begun.cash + 200);
+  });
+  it('normalises names without requiring a real identity', () => {
+    expect(normaliseCharacter({ name: '   ' }).name).toBe(DEFAULT_CHARACTER.name);
+    expect(normaliseCharacter({ name: '  王  Mei   ' }).name).toBe('王 Mei');
+    expect(Array.from(normaliseCharacter({ name: '🌻'.repeat(40) }).name)).toHaveLength(24);
+    expect(normaliseCharacter({ skinTone: -1 }).skinTone).toBe(DEFAULT_CHARACTER.skinTone);
+  });
+  it('gender and skin tone cannot change earnings or encounter outcomes', () => {
+    for (const skinTone of SKIN_TONES.keys()) {
+      const s = ready();
+      s.character = { name: 'Player', gender: 'non-binary', skinTone };
+      expect(rates(s).tap).toBe(200);
+      expect(tap(s).cash).toBe(5200);
+    }
+  });
+  it('repeated START cannot reset character or briefings', () => {
+    const s = ready();
+    expect(reducer(s, { type: 'START', character: { name: 'Other' } })).toEqual(s);
+  });
+});
+
+describe('tap-only economy and staged events', () => {
+  it('earns one stage note per tap and preserves existing balances when saves reload', () => {
+    for (const [stage, amount] of [2, 10, 50, 100].entries()) {
+      const s = selected(ENCOUNTERS.find(e => e.stage === stage)!.id);
+      s.phone.open = false;
+      expect(rates(s).tap).toBe(amount * 100);
+      expect(rates({ ...s, upgrade: true }).tap).toBe(amount * 200);
+      expect(roundTrip(s).cash).toBe(s.cash);
+    }
+  });
+  it('starts with a S$2 note and waits until the first request can be afforded', () => {
+    let s = ready();
+    expect(s.cash).toBe(5000);
+    s = tap(s, 14);
+    expect(s.cash).toBe(7800);
     expect(activeCase(s)).toBeUndefined();
-    s = tap(s, 4); expect(activeCase(s)).toBeUndefined();
-    s = tap(s, 1); expect(activeCase(s)).toBe('school-a');
-    expect(s.phone).toMatchObject({ open: true, app: 'messages', caseId: 'school-a' });
-    expect(s.cash).toBe(15000); expect(s.stageTaps).toBe(5);
-    expect(wait(s, 60)).toEqual(s);
-    expect(reducer(s, { type: 'UPGRADE' })).toEqual(s);
-    expect(reducer(s, { type: 'TAP', now: 10000 })).toEqual(s);
-    expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
-    expect(reducer(s, { type: 'ACK' })).toEqual(s);
-    expect(reducer(s, { type: 'ADVANCE' })).toEqual(s);
-    expect(reducer(s, { type: 'APP', app: 'contacts' }).phone.app).toBe('contacts');
-    s = start();
-    s = reducer(s, { type: 'HIDDEN', hidden: true });
-    expect(wait(s, 60)).toEqual(s);
-    expect(tap(s, 5)).toEqual(s);
+    s = tap(s);
+    expect(s.cash).toBe(8000);
+    expect(activeCase(s)).toBe('school-a');
   });
-  it('registers rapid taps even with identical timestamps', () => {
-    let s = start();
-    for (let i = 0; i < 4; i++) s = reducer(s, { type: 'TAP', now: 0 });
-    expect(s.cash).toBe(13000); expect(s.stageTaps).toBe(4);
-    s = reducer(s, { type: 'TAP', now: 0 });
-    expect(s.cash).toBe(15000); expect(s.stageTaps).toBe(5); expect(s.phone.open).toBe(true);
+  it('has twelve encounters, three per stage and one genuine opportunity per stage', () => {
+    expect(ENCOUNTERS).toHaveLength(12);
+    for (let stage = 0; stage < 4; stage++) {
+      expect(ENCOUNTERS.filter(e => e.stage === stage)).toHaveLength(3);
+      expect(ENCOUNTERS.filter(e => e.stage === stage && !e.scam)).toHaveLength(1);
+    }
   });
-  it('never turns elapsed time into income, including with the school bonus', () => {
-    let s = start();
-    s = { ...s, stage: 0, progress: { ...s.progress, 'school-b': { ...s.progress['school-b'], result: { decision: 'proceed', verified: true, unsafe: false, personalDelta: -10000, employerLoss: 0, missed: false } } } };
+  it('uses Fisher-Yates permutations, not just forward or reverse ordering', () => {
+    const orders = new Set<string>();
+    for (const first of [0, .34, .8]) for (const second of [0, .8]) {
+      let i = 0; const values = [first, second];
+      orders.add(createGame(() => values[(i++) % 2]).order[0].join(','));
+    }
+    expect(orders.size).toBe(6);
+  });
+  it('all rapid taps register and TICK never earns income', () => {
+    let s = ready();
     const before = s.cash;
-    for (let i = 0; i < 1000; i++) s = reducer(s, { type: 'TICK', ms: 1 });
-    expect(s.cash).toBe(before); expect(s.gross).toBe(0);
-    expect(reducer(s, { type: 'TICK', ms: 86400000 }).cash).toBe(before);
-    expect(tap(s, 1).cash - s.cash).toBe(2400);
+    s = reducer(s, { type: 'TAP', now: 1 });
+    s = reducer(s, { type: 'TAP', now: 1 });
+    s = reducer(s, { type: 'TAP', now: 1 });
+    expect(s.cash - before).toBe(600);
+    const ticked = reducer(s, { type: 'TICK', ms: 100000 });
+    expect(ticked.cash).toBe(s.cash);
+    expect(ticked.gross).toBe(s.gross);
+    expect(ticked.activeMs).toBe(1000);
   });
-  it.each([0, 1, 2, 3])('stage %i grants no idle earnings with or without an upgrade', stage => {
-    for (const upgrade of [false, true]) {
-      const s = { ...start(), stage, upgrade };
-      const after = wait(s, 60);
-      expect(after.cash).toBe(s.cash); expect(after.gross).toBe(s.gross);
-      expect(after.activeMs).toBe(60000); expect(activeCase(after)).toBeUndefined();
-    }
-  });
-  it('requires both resolved requests as well as the money milestone', () => {
-    const s = { ...start(), cash: 200000, gross: 200000 }; expect(canAdvance(s)).toBe(false);
-    expect(reducer(s, { type: 'ADVANCE' }).stage).toBe(0);
-  });
-  it('purchases an upgrade once without reducing lifetime earnings', () => {
-    let s = { ...start(), cash: 45000, gross: 40000 }; const before = s.cash, gross = s.gross;
-    s = reducer(s, { type: 'UPGRADE' });
-    expect(s.cash).toBe(before - 20000); expect(s.gross).toBe(gross);
-    expect(rates(s)).toEqual({ tap: 4000 });
-    expect(reducer(s, { type: 'UPGRADE' })).toEqual(s);
-  });
-  it.each([0, 1, 2, 3])('stage %i credits exactly the displayed tap rate with and without upgrades', stage => {
-    for (const upgrade of [false, true]) {
-      const s = { ...start(), stage, upgrade };
-      expect(tap(s, 1).cash - s.cash).toBe(rates(s).tap);
-    }
-  });
-  it('combines the school item bonus with the upgrade in the displayed tap amount', () => {
-    const s = { ...completedThrough(0), upgrade: true };
-    s.progress['school-b'].result!.decision = 'proceed';
-    expect(rates(s).tap).toBe(4800);
-    expect(tap(s, 1).cash - s.cash).toBe(4800);
-  });
-});
-
-describe('automatic life stages', () => {
-  it.each(['ACK', 'PHONE'] as const)('waits for reading the last outcome, then advances on %s', close => {
-    let s = { ...start(), cash: 100000, gross: 100000 };
-    s = reducer(s, { type: 'UPGRADE' });
-    s = tap(s, 5);
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    s = reducer(s, { type: 'ACK' });
-    expect(s.stage).toBe(0);
-    s = tap(s, 5);
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(canAdvance(s)).toBe(true);
-    expect(s.stage).toBe(0); expect(s.phone.app).toBe('feedback'); expect(s.phone.open).toBe(true);
-    expect(wait(s, 60)).toEqual(s); expect(tap(s, 1)).toEqual(s);
-    expect(reducer(s, { type: 'ADVANCE' })).toEqual(s);
-    const before = s;
-    s = reducer(s, close === 'ACK' ? { type: 'ACK' } : { type: 'PHONE', open: false });
-    expect(s.stage).toBe(1); expect(s.phone.open).toBe(false); expect(s.upgrade).toBe(false);
-    expect(s.cash).toBe(before.cash); expect(s.gross).toBe(before.gross);
-    expect(s.progress).toEqual(before.progress); expect(s.ledger).toEqual(before.ledger); expect(s.calls).toEqual(before.calls);
-    expect(s.stageTaps).toBe(0); expect(s.stageMs).toBe(0); expect(s.lastResolutionTap).toBeNull();
-    expect(tap(s, 4).phone.open).toBe(false);
-    expect(tap(s, 5).phone.open).toBe(true);
-  });
-  it('advances on the earning tap that crosses the threshold after both requests were resolved', () => {
-    const s = { ...completedThrough(0), cash: 90000, gross: 99000, upgrade: true };
-    const after = tap(s, 1);
-    expect(after.stage).toBe(1); expect(after.cash - s.cash).toBe(4000);
-    expect(after.gross).toBe(103000); expect(after.upgrade).toBe(false);
-    expect(after.progress).toEqual(s.progress);
-  });
-  it('resumes an eligible old save automatically on the next tick without awarding money', () => {
-    const saved = { ...completedThrough(1), cash: 800000, gross: 1000000, upgrade: true };
-    const restored = decodeSave(JSON.stringify(saved))!;
-    expect(restored.stage).toBe(1);
-    const after = wait(restored, 1);
-    expect(after.stage).toBe(2); expect(after.cash).toBe(saved.cash); expect(after.gross).toBe(saved.gross);
-    expect(after.upgrade).toBe(false); expect(after.stageTaps).toBe(0);
-  });
-  it('finishes automatically only after one million is held and every encounter has resolved', () => {
-    let s = { ...completedThrough(3), cash: 99900000 };
-    s.progress['home-b'].result = null;
-    s = open(s, 'home-b');
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    s = reducer(s, { type: 'ACK' });
-    expect(s.finished).toBe(false);
-    s = tap(s, 1);
-    expect(s.cash).toBeGreaterThanOrEqual(100000000); expect(s.finished).toBe(true);
-    expect(s.phone.open).toBe(false); expect(resolvedCount(s)).toBe(8);
-  });
-  it('keeps the final outcome readable even when savings already exceed one million', () => {
-    let s = { ...completedThrough(3), cash: 100000000 };
-    s.progress['home-b'].result = null;
-    s = open(s, 'home-b');
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(s.finished).toBe(false); expect(s.phone.app).toBe('feedback');
-    expect(wait(s, 1).finished).toBe(false);
-    expect(reducer(s, { type: 'ACK' }).finished).toBe(true);
-  });
-  it('does not turn a forged final-stage-only result into a completed life', () => {
-    const s = { ...completedThrough(3), cash: 100000000 };
-    s.progress['school-a'].result = null;
-    expect(canAdvance(s)).toBe(false); expect(wait(s, 1).finished).toBe(false);
-  });
-});
-
-describe('persistent phone browsing', () => {
-  it('persists an idle notification centre without pausing tap earnings', () => {
-    const s = reducer(start(), { type: 'APP', app: 'notifications' });
-    expect(s.phone).toMatchObject({ app: 'notifications', open: false, caseId: null, record: null });
-    const restored = decodeSave(JSON.stringify(s))!;
-    expect(restored.phone).toEqual(s.phone);
-    expect(tap(restored, 1).cash).toBe(s.cash + 2000);
-  });
-  it('keeps a pending notification centre paused across reloads and opens the selected request', () => {
-    let s = tap(start(), 5);
-    s = reducer(s, { type: 'APP', app: 'notifications' });
-    s = decodeSave(JSON.stringify(s))!;
-    expect(s.phone).toMatchObject({ app: 'notifications', open: true, caseId: 'school-a' });
-    expect(tap(s, 1)).toEqual(s);
-    s = reducer(s, { type: 'CASE', id: 'school-a' });
-    expect(s.phone).toMatchObject({ app: 'messages', open: true, caseId: 'school-a' });
-    expect(s.progress['school-a'].read).toBe(true);
-  });
-  it('resumes a developer-exited request on notification navigation without changing its evidence', () => {
-    let s = inspect(tap(start(), 5), 'market');
-    s = reducer(s, { type: 'DEV_EXIT' });
-    const progress = s.progress;
-    s = reducer(s, { type: 'APP', app: 'notifications' });
-    expect(s.phone.open).toBe(true); expect(s.progress).toEqual(progress);
-    expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
-  });
-  it('allows idle bank and app navigation without pausing earnings or time', () => {
-    let s = reducer(start(), { type: 'APP', app: 'bank' });
-    expect(s.phone).toMatchObject({ app: 'bank', open: false });
-    const cash = s.cash;
-    s = tap(s, 1);
-    expect(s.cash).toBe(cash + 2000); expect(s.phone.app).toBe('bank');
-    s = wait(s, 1); expect(s.activeMs).toBe(1000);
-    s = reducer(s, { type: 'BACK' });
-    expect(s.phone).toMatchObject({ app: 'home', open: false });
-    s = reducer(s, { type: 'APP', app: 'mail', list: true });
-    expect(s.phone).toMatchObject({ app: 'mail', record: 'list', open: false });
-    expect(decodeSave(JSON.stringify(s))?.phone).toEqual(s.phone);
-    expect(reducer(s, { type: 'PHONE', open: true }).phone.open).toBe(false);
-  });
-  it('lets idle browsing advance automatically when the stage gate is met', () => {
-    let s = { ...completedThrough(0), gross: 99000 };
-    s = reducer(s, { type: 'APP', app: 'bank' });
-    expect(tap(s, 1).stage).toBe(1);
-    s = { ...s, gross: 100000 };
-    expect(wait(s, 1).stage).toBe(1);
-  });
-  it('reviews archived evidence without pausing or granting retroactive verification', () => {
-    let s = completedThrough(0);
-    s = reducer(s, { type: 'CASE', id: 'school-a' });
-    expect(s.phone).toMatchObject({ caseId: 'school-a', app: 'messages', open: false });
-    s = inspect(s, 'market');
-    expect(s.phone).toMatchObject({ app: 'contacts', record: 'market', open: false });
-    expect(s.progress['school-a'].evidence).toEqual([]);
-    expect(s.progress['school-a'].result?.verified).toBe(false);
-    expect(tap(s, 1).cash).toBe(s.cash + 2000);
-  });
-  it.each(['APP', 'BACK', 'CASE', 'INSPECT'] as const)('%s re-engages a pending encounter after a development exit', action => {
-    let s = inspect(tap(start(), 5), 'market');
-    s = reducer(s, { type: 'DEV_EXIT' });
-    expect(s.phone.open).toBe(false);
-    s = reducer(s, action === 'APP' ? { type: action, app: 'bank' } : action === 'CASE' ? { type: action, id: 'school-a' } : action === 'INSPECT' ? { type: action, id: 'market' } : { type: action });
+  it('queues after five taps once affordable, then pauses earning and time until addressed', () => {
+    const s = tap(funded(), 5);
+    expect(activeCase(s)).toBe('school-a');
     expect(s.phone.open).toBe(true);
-    expect(tap(s, 1)).toEqual(s);
+    expect(tap(s)).toEqual(s);
+    expect(reducer(s, { type: 'TICK', ms: 500 })).toEqual(s);
+    expect(reducer(s, { type: 'UPGRADE' })).toEqual(s);
     expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
-    expect(reducer(s, { type: 'ACK' })).toEqual(s);
-    expect(s.progress['school-a'].result).toBeNull();
   });
-  it('cannot bypass a pending request by navigating to an archived conversation', () => {
-    let s = tap(start(), 5);
+  it('waits for sufficient funds before a mandatory encounter appears', () => {
+    let s = ready();
+    s.stage = 1; s.cash = 0; s.order[1] = ['uni-a', 'uni-b', 'uni-c'];
+    s = tap(s, 179);
+    expect(activeCase(s)).toBeUndefined();
+    s = tap(s);
+    expect(activeCase(s)).toBe('uni-a');
+    expect(s.cash).toBe(180000);
+  });
+  it('five more taps are needed after a resolution', () => {
+    let s = tap(funded(), 5);
     s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
+    s = reducer(s, { type: 'ACK' });
+    s = tick(s, EVENT_COOLDOWN_MS);
+    s = tap(s, 4);
+    expect(activeCase(s)).toBeUndefined();
+    s = tap(s);
+    expect(activeCase(s)).toBe('school-b');
+  });
+  it('rapid taps cannot skip the cooldown, and the event queues at exactly ten active seconds', () => {
+    expect(EVENT_COOLDOWN_MS).toBe(10000);
+    let s = reducer(tap(funded(), 5), { type: 'RESOLVE', decision: 'decline' });
+    s = reducer(s, { type: 'ACK' });
+    s = tap(s, 100);
+    expect(activeCase(s)).toBeUndefined();
+    s = tick(s, EVENT_COOLDOWN_MS - 1);
+    expect(activeCase(s)).toBeUndefined();
+    s = reducer(s, { type: 'TICK', ms: 1 });
+    expect(activeCase(s)).toBe('school-b');
+    expect(s.phone.open).toBe(true);
+  });
+  it('time during an outcome, hidden tab or briefing never consumes the cooldown', () => {
+    let s = reducer(tap(funded(), 5), { type: 'RESOLVE', decision: 'decline' });
+    s = tick(s, EVENT_COOLDOWN_MS);
+    expect(s.activeMs).toBe(0);
     s = reducer(s, { type: 'ACK' });
     s = tap(s, 5);
-    s = reducer(s, { type: 'DEV_EXIT' });
-    s = reducer(s, { type: 'CASE', id: 'school-a' });
-    expect(s.phone.open).toBe(true); expect(activeCase(s)).toBe('school-b');
-    expect(tap(s, 1)).toEqual(s); expect(reducer(s, { type: 'ACK' })).toEqual(s);
-    s = reducer(s, { type: 'CASE', id: 'school-b' });
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(s.progress['school-b'].result).not.toBeNull();
+    s = reducer(s, { type: 'HIDDEN', hidden: true });
+    s = tick(s, EVENT_COOLDOWN_MS);
+    expect(s.activeMs).toBe(0);
+    s = reducer(s, { type: 'HIDDEN', hidden: false });
+    s = { ...s, briefing: true };
+    s = tick(s, EVENT_COOLDOWN_MS);
+    expect(s.activeMs).toBe(0);
+    expect(activeCase(s)).toBeUndefined();
   });
-  it('keeps outcome reading paused when moving between apps until Continue', () => {
-    let s = tap(start(), 5);
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    s = reducer(s, { type: 'APP', app: 'bank' });
-    expect(s.phone.open).toBe(true); expect(tap(s, 1)).toEqual(s);
+  it('reload preserves the remaining cooldown without granting offline time', () => {
+    let s = reducer(tap(funded(), 5), { type: 'RESOLVE', decision: 'decline' });
     s = reducer(s, { type: 'ACK' });
-    expect(s.phone.open).toBe(false); expect(tap(s, 1).cash).toBe(s.cash + 2000);
+    s = tap(s, 5);
+    s = roundTrip(tick(s, 4000));
+    expect(activeCase(s)).toBeUndefined();
+    s = tick(s, 5999);
+    expect(activeCase(s)).toBeUndefined();
+    expect(activeCase(reducer(s, { type: 'TICK', ms: 1 }))).toBe('school-b');
+  });
+  it('upgrades can be purchased once and apply only to current stage', () => {
+    let s = ready(); s.cash = 30000;
+    s = reducer(s, { type: 'UPGRADE' });
+    expect(s.cash).toBe(10000);
+    expect(rates(s).tap).toBe(400);
+    expect(reducer(s, { type: 'UPGRADE' })).toEqual(s);
+  });
+  it('hidden tabs block income and active time', () => {
+    const s = reducer(ready(), { type: 'HIDDEN', hidden: true });
+    expect(tap(s)).toEqual(s);
+    expect(reducer(s, { type: 'TICK', ms: 100 })).toEqual(s);
+  });
+  it('idle phone navigation does not pause tapping', () => {
+    const s = reducer(ready(), { type: 'APP', app: 'profile' });
+    expect(s.phone.open).toBe(false);
+    expect(tap(s).cash).toBe(s.cash + 200);
+  });
+  it('leaving a resolved debrief through Phone home resumes play and its cooldown', () => {
+    let s = reducer(tap(funded(), 5), { type: 'RESOLVE', decision: 'decline' });
+    expect(s.phone.open).toBe(true);
+    s = reducer(s, { type: 'BACK' });
+    expect(s.phone.open).toBe(false);
+    s = tap(s, 5);
+    expect(activeCase(s)).toBeUndefined();
+    s = tick(s, EVENT_COOLDOWN_MS - 1);
+    expect(activeCase(s)).toBeUndefined();
+    expect(activeCase(reducer(s, { type: 'TICK', ms: 1 }))).toBe('school-b');
   });
 });
 
-describe('development encounter exit', () => {
-  it('preserves the request and evidence while allowing test earnings and upgrades', () => {
-    let s = tap(start(), 5);
-    s = inspect(s, 'market');
-    const progress = s.progress, initialCash = s.cash;
-    s = reducer(s, { type: 'DEV_EXIT' });
-    expect(s.phone.open).toBe(false); expect(s.progress).toEqual(progress);
-    expect(s.progress['school-a'].result).toBeNull(); expect(activeCase(s)).toBe('school-a');
-    s = tap(s, 5);
-    expect(s.cash).toBe(initialCash + 10000); expect(s.phone.open).toBe(false);
-    expect(s.progress['school-b'].arrived).toBe(false);
-    s = reducer(s, { type: 'UPGRADE' }); expect(s.upgrade).toBe(true);
-    s = reducer(s, { type: 'PHONE', open: true });
-    expect(s.phone.caseId).toBe('school-a'); expect(s.phone.open).toBe(true);
-    expect(reducer(s, { type: 'PHONE', open: false })).toEqual(s);
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(s.progress['school-a'].result?.verified).toBe(true);
-    s = reducer(s, { type: 'ACK' });
-    s = tap(s, 4); expect(activeCase(s)).toBeUndefined();
-    s = tap(s, 1); expect(activeCase(s)).toBe('school-b'); expect(s.phone.open).toBe(true);
+describe('all scenario paths and independent evidence', () => {
+  it.each(ENCOUNTERS)('$id contains independently navigable evidence', e => {
+    const decisive = e.evidence.find(x => x.id === e.decisive);
+    expect(decisive?.app).toBe('contacts');
+    expect(decisive?.contactId).toBeTruthy();
+    expect(decisive?.body.length).toBeGreaterThan(0);
+    expect(e.sources.length).toBeGreaterThan(0);
   });
-  it('restores the mandatory request after a development exit and reload', () => {
-    const s = reducer(tap(start(), 5), { type: 'DEV_EXIT' });
-    const restored = decodeSave(JSON.stringify(s))!;
-    expect(restored.phone.open).toBe(true); expect(activeCase(restored)).toBe('school-a');
-    expect(restored.progress['school-a'].result).toBeNull();
+  it.each(ENCOUNTERS)('$id verification is earned before an appropriate decision', e => {
+    let s = answer(selected(e.id));
+    s = inspect(s);
+    s = reducer(s, { type: 'RESOLVE', decision: e.scam ? 'decline' : 'proceed' });
+    const result = s.progress[e.id].result!;
+    expect(result.verified).toBe(true);
+    expect(result.unsafe).toBe(false);
+    expect(result.inspectedEvidence).toContain(e.decisive);
+    expect(s.cash).toBeGreaterThanOrEqual(0);
   });
-  it('ignores the development exit in a production environment', () => {
-    const s = tap(start(), 5);
-    vi.stubEnv('DEV', false);
-    try { expect(reducer(s, { type: 'DEV_EXIT' })).toEqual(s); }
-    finally { vi.unstubAllEnvs(); }
-  });
-});
-
-describe('decisions, verification and money', () => {
-  it.each(ENCOUNTERS.map(e => [e.id]))('%s has independently accessible evidence and idempotent outcomes', id => {
-    let s = fixture(id); const e = CASES[id];
-    s = inspect(s, e.decisive);
-    const before = s.cash;
-    s = reducer(s, { type: 'RESOLVE', decision: e.scam ? 'report' : 'proceed' });
-    expect(s.progress[id].result?.verified).toBe(true);
-    expect(s.cash).toBe(before + s.progress[id].result!.personalDelta);
+  it.each(ENCOUNTERS)('$id supports an unverified commitment without duplicate consequences', e => {
+    let s = answer(selected(e.id));
+    const cash = s.cash;
+    s = reducer(s, { type: 'RESOLVE', decision: 'proceed' });
+    expect(s.progress[e.id].result?.unsafe).toBe(e.scam);
+    expect(s.progress[e.id].result?.verified).toBe(false);
+    expect(s.cash).toBe(cash + ((e.reward ?? 0) - e.cost) * 100);
+    s = roundTrip(s);
     expect(reducer(s, { type: 'RESOLVE', decision: 'proceed' })).toEqual(s);
-    expect(reducer(s, { type: 'SAMPLE' })).toEqual(s);
   });
-  it.each(ENCOUNTERS.map(e => [e.id]))('%s can be declined without evidence or a financial trap', id => {
-    const s = reducer(fixture(id, 0), { type: 'RESOLVE', decision: 'decline' });
-    expect(s.cash).toBe(0); expect(s.progress[id].result?.verified).toBe(false);
-    expect(s.progress[id].result?.unsafe).toBe(false);
+  it.each(ENCOUNTERS)('$id can be declined or reported without a payment', e => {
+    for (const decision of ['decline', 'report'] as const) {
+      const s = answer(selected(e.id));
+      const out = reducer(s, { type: 'RESOLVE', decision });
+      expect(out.cash).toBe(s.cash);
+      expect(out.progress[e.id].result?.verified).toBe(false);
+      expect(out.progress[e.id].result?.unsafe).toBe(false);
+    }
   });
-  it('sender reassurance cannot count as independent verification', () => {
-    let s = inspect(fixture('office-a'), 'reply');
+  it('sender reassurance is not independent verification', () => {
+    let s = inspect(selected('office-a'), 'reply');
     s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
     expect(s.progress['office-a'].result?.verified).toBe(false);
   });
-  it('a real introductory commission is received once and is not lifetime earnings', () => {
-    let s = fixture('uni-a'); const before = s.cash;
-    s = reducer(s, { type: 'SAMPLE' });
-    expect(s.cash).toBe(before + 5000); expect(s.gross).toBe(0);
-    expect(reducer(s, { type: 'SAMPLE' })).toEqual(s);
-    s = reducer(s, { type: 'RESOLVE', decision: 'proceed' });
-    expect(s.cash).toBe(before + 5000 - 100000);
-    expect(s.progress['uni-a'].result?.unsafe).toBe(true);
+  it('cannot inspect Contacts evidence from the suspicious conversation', () => {
+    const s = selected('office-a');
+    expect(reducer(s, { type: 'INSPECT', id: 'independent' })).toEqual(s);
   });
-  it('blocks unaffordable payments while allowing a safe resolution', () => {
-    const s = fixture('home-a', 10);
+  it('post-outcome inspection cannot retroactively earn verification', () => {
+    let s = reducer(selected('office-a'), { type: 'RESOLVE', decision: 'decline' });
+    s = inspect(s);
+    expect(s.progress['office-a'].evidence).toEqual([]);
+    expect(s.progress['office-a'].result?.inspectedEvidence).toEqual([]);
+    expect(s.progress['office-a'].result?.verified).toBe(false);
+  });
+  it('insufficient funds block payment, never safe decline', () => {
+    const s = selected('uni-a'); s.cash = 0;
     expect(reducer(s, { type: 'RESOLVE', decision: 'proceed' })).toEqual(s);
-    const declined = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(declined.cash).toBe(10); expect(declined.progress['home-a'].result).not.toBeNull();
+    expect(reducer(s, { type: 'RESOLVE', decision: 'decline' }).progress['uni-a'].result).not.toBeNull();
   });
-  it('keeps employer losses separate and allows declining a verified family request', () => {
-    let s = fixture('office-a'); const before = s.cash;
-    s = reducer(s, { type: 'RESOLVE', decision: 'proceed' });
-    expect(s.cash).toBe(before); expect(s.progress['office-a'].result?.employerLoss).toBe(5000);
-    s = inspect(fixture('home-b'), 'family');
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    expect(s.progress['home-b'].result).toMatchObject({ verified: true, unsafe: false, missed: false, personalDelta: 0 });
+  it('rewards are posted once and excluded from stage-gate lifetime taps', () => {
+    const s = selected('uni-c'), out = reducer(s, { type: 'RESOLVE', decision: 'proceed' });
+    expect(out.cash - s.cash).toBe(100000);
+    expect(out.gross).toBe(s.gross);
+    expect(out.ledger.filter(l => l.id === 'uni-c-result')).toHaveLength(1);
+  });
+  it('verified genuine friend requests can be politely declined', () => {
+    const s = reducer(inspect(answer(selected('home-c'))), { type: 'RESOLVE', decision: 'decline' });
+    expect(s.progress['home-c'].result).toMatchObject({ verified: true, unsafe: false, missed: false, personalDelta: 0 });
   });
 });
 
-describe('complete journeys and persistence', () => {
-  it.each(['messages', 'mail'] as const)('keeps the %s list open across a reload and permits returning to the request', app => {
-    let s = fixture('school-a');
-    s = reducer(s, { type: 'APP', app, list: true });
-    expect(s.phone).toMatchObject({ app, record: 'list', open: true });
-    s = decodeSave(JSON.stringify(s))!;
-    expect(s).not.toBeNull(); expect(s.phone.record).toBe('list');
-    s = reducer(s, { type: 'CASE', id: 'school-a' });
-    expect(s.phone).toMatchObject({ app: 'messages', record: null, caseId: 'school-a' });
+describe('calls and persisted investigation', () => {
+  it.each(['home-a', 'home-b', 'home-c'])('%s rings until explicitly answered or declined', id => {
+    const s = selected(id);
+    expect(s.progress[id].callStatus).toBe('ringing');
+    expect(reducer(s, { type: 'RESOLVE', decision: 'proceed' })).toEqual(s);
+    const answered = reducer(s, { type: 'CALL_ANSWER' });
+    expect(answered.progress[id].callStatus).toBe('answered');
+    expect(answered.phone.app).toBe('calls');
+    expect(answered.progress[id].evidence).toEqual([]);
+    const declined = reducer(s, { type: 'CALL_DECLINE' });
+    expect(declined.progress[id].result).toBeNull();
+    expect(declined.phone.app).toBe('messages');
+    expect(encounterChannel(roundTrip(declined), id)).toBe('messages');
   });
-  it('saves an empty inbox list before the first request', () => {
-    let s = reducer(start(), { type: 'PHONE', open: true });
-    s = reducer(s, { type: 'APP', app: 'mail', list: true });
-    expect(decodeSave(JSON.stringify(s))?.phone).toMatchObject({ app: 'mail', caseId: null, record: 'list' });
+  it('saved-contact calls are recorded and cannot substitute incoming reassurance', () => {
+    let s = answer(selected('home-b'));
+    s = inspect(s, 'caller');
+    expect(s.progress['home-b'].evidence).not.toContain('independent');
+    s = inspect(s);
+    s = inspect(s);
+    expect(s.calls).toHaveLength(1);
+    expect(roundTrip(s).calls).toEqual(s.calls);
   });
-  it('does not create or accept list navigation for non-message apps', () => {
-    const s = fixture('school-a');
-    expect(reducer(s, { type: 'APP', app: 'contacts', list: true }).phone.record).toBeNull();
-    expect(decodeSave(JSON.stringify({ ...s, phone: { ...s.phone, app: 'contacts', record: 'list' } }))).toBeNull();
+  it('ending an answered call opens its follow-up without resolving the request', () => {
+    const s = reducer(answer(selected('home-a')), { type: 'CALL_DECLINE' });
+    expect(s.phone.app).toBe('messages');
+    expect(s.progress['home-a'].callStatus).toBe('declined');
+    expect(s.progress['home-a'].result).toBeNull();
   });
-  it.each([
-    ['school-a', 'market', 'contacts'],
-    ['uni-a', 'portal', 'mail'],
-    ['uni-a', 'dashboard', 'messages'],
-  ])('migrates legacy Browser record %s/%s into %s without changing history', (id, record, app) => {
-    const s = completedThrough(CASES[id].stage);
-    s.progress[id].result = null;
-    s.progress[id].evidence = [record];
-    s.phone = { open: true, app: 'home', caseId: id, record: null };
-    if (id === 'uni-a') s.calls = [{ caseId: id, evidenceId: 'campus' }];
-    const saved = JSON.stringify({ ...s, phone: { ...s.phone, app: 'browser', record } });
-    const restored = decodeSave(saved)!;
-    expect(restored).not.toBeNull();
-    expect(restored.phone).toMatchObject({ app, caseId: id, record, open: true });
-    expect(restored.progress).toEqual(s.progress); expect(restored.calls).toEqual(s.calls);
-    expect(restored.ledger).toEqual(s.ledger); expect(restored.cash).toBe(s.cash);
+  it('My Card remains accessible during a mandatory event without clearing it', () => {
+    const s = reducer(selected('office-a'), { type: 'APP', app: 'profile' });
+    expect(s.phone.open).toBe(true);
+    expect(activeCase(s)).toBe('office-a');
+    expect(s.character.name).toBe('Nur Aisha');
   });
-  it('returns an empty legacy Browser view to phone home', () => {
-    const s = fixture('school-a');
-    const restored = decodeSave(JSON.stringify({ ...s, phone: { ...s.phone, app: 'browser', record: null } }))!;
-    expect(restored.phone).toMatchObject({ open: true, app: 'home', caseId: 'school-a', record: null });
+  it('reload preserves randomized order, receipts and profile', () => {
+    const s = inspect(answer(selected('home-c')));
+    const out = roundTrip(s);
+    expect(out.order).toEqual(s.order);
+    expect(out.character).toEqual(s.character);
+    expect(out.ledger).toEqual(s.ledger);
+    expect(out.progress).toEqual(s.progress);
   });
-  it('preserves an older save balance without resuming its former idle income', () => {
-    const oldSave: Record<string, unknown> = { ...start(), cash: 123456, gross: 118456, remainder: 999 };
-    delete oldSave.stageTaps; delete oldSave.lastResolutionTap;
-    const restored = decodeSave(JSON.stringify(oldSave))!;
-    expect(restored).not.toBeNull();
-    expect(restored.cash).toBe(oldSave.cash); expect(restored.gross).toBe(oldSave.gross);
-    const after = wait(restored, 60);
-    expect(after.cash).toBe(oldSave.cash); expect(after.gross).toBe(oldSave.gross);
-    expect(restored.stageTaps).toBe(0); expect(restored.lastResolutionTap).toBeNull();
+  it('reload restores mandatory pause after development exit', () => {
+    const s = selected('office-a'); s.phone.open = false;
+    expect(roundTrip(s).phone.open).toBe(true);
   });
-  it('opens an unresolved request when resuming a legacy save with the phone closed', () => {
-    const s = start(); s.progress['school-a'].arrived = true;
-    const restored = decodeSave(JSON.stringify(s))!;
-    expect(restored.phone).toMatchObject({ open: true, caseId: 'school-a', app: 'messages' });
-    expect(tap(restored, 3).cash).toBe(restored.cash);
+  it('recovers an old stuck phone pause without losing resolved encounters or savings', () => {
+    const s = reducer(selected('school-a'), { type: 'RESOLVE', decision: 'decline' });
+    s.phone.app = 'home';
+    const restored = roundTrip(s);
+    expect(restored.phone.open).toBe(false);
+    expect(restored.cash).toBe(s.cash);
+    expect(restored.progress).toEqual(s.progress);
+    expect(tap(restored).cash).toBe(restored.cash + rates(restored).tap);
   });
-  it.each(['cautious', 'mistakes', 'decline everything'])('%s run reaches the million with all history intact after reloads', strategy => {
-    let s = start();
-    for (let stage = 0; stage < 4; stage++) {
-      let safety = 0;
-      while (s.stage === stage && !s.finished && safety++ < 1000) {
-        const id = activeCase(s);
-        if (id) {
-          const e = CASES[id];
-          expect(s.phone.open).toBe(true);
-          expect(s.cash).toBeGreaterThanOrEqual(0);
-          s = open(s, id);
-          if (strategy === 'cautious') s = inspect(s, e.decisive);
-          if (id === 'uni-a') s = reducer(s, { type: 'SAMPLE' });
-          s = reducer(s, { type: 'RESOLVE', decision: s.cash < e.cost * 100 || strategy === 'decline everything' || strategy === 'cautious' && e.scam ? 'decline' : 'proceed' });
-          expect(s.stage).toBe(stage); expect(s.finished).toBe(false); expect(s.phone.app).toBe('feedback');
-          const saved = JSON.stringify(s), cash = s.cash;
-          s = decodeSave(saved)!; expect(s).not.toBeNull(); expect(s.cash).toBe(cash);
-          expect(reducer(s, { type: 'RESOLVE', decision: 'proceed' }).cash).toBe(cash);
-          s = reducer(s, { type: 'ACK' });
-        } else {
-          if (!s.upgrade && s.cash >= STAGES[stage].cost * 100) s = reducer(s, { type: 'UPGRADE' });
-          s = tap(s, 1);
-        }
-      }
-      if (stage < 3) { expect(s.stage).toBe(stage + 1); expect(s.upgrade).toBe(false); expect(rates(s).tap).toBe([20000, 200000, 1000000][stage]); }
-      else expect(s.finished).toBe(true);
+  it('keeps an unfinished debrief paused on reload', () => {
+    const s = reducer(selected('school-a'), { type: 'RESOLVE', decision: 'decline' });
+    const restored = roundTrip(s);
+    expect(restored.phone).toEqual(s.phone);
+    expect(tap(restored)).toEqual(restored);
+  });
+  it('rejects incompatible legacy saves without overwriting their storage key', () => {
+    expect(SAVE_KEY).not.toBe('scamagotchi.life.v1');
+    expect(decodeSave(JSON.stringify({ ...ready(), version: 1 }))).toBeNull();
+  });
+  it('rejects malformed money, order, record and character data', () => {
+    for (const mutate of [
+      (s: GameState) => { s.cash = -1; },
+      (s: GameState) => { s.order[0][1] = s.order[0][0]; },
+      (s: GameState) => { s.character.skinTone = 22; },
+      (s: GameState) => { s.phone.record = 'invented'; },
+      (s: GameState) => { s.ledger.push(s.ledger[0]); },
+    ]) {
+      const s = ready(); mutate(s); expect(decodeSave(JSON.stringify(s))).toBeNull();
     }
-    expect(s.finished).toBe(true); expect(s.cash).toBeGreaterThanOrEqual(100000000); expect(resolvedCount(s)).toBe(8);
-    if (strategy === 'mistakes') expect(Object.values(s.progress).filter(p => p.result?.unsafe)).toHaveLength(4);
-    if (strategy === 'cautious') expect(s.calls).toHaveLength(8);
-    expect(s.ledger.filter(l => l.id === 'uni-a-sample')).toHaveLength(1);
-    expect(s.order).toEqual(createGame(() => 0).order);
   });
-  it('requires five new taps after resolution and restores that threshold across reloads', () => {
-    let s = tap(start(), 5);
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    s = reducer(s, { type: 'PHONE', open: false });
-    s = wait(s, 60); expect(activeCase(s)).toBeUndefined();
-    s = tap(s, 4); expect(activeCase(s)).toBeUndefined();
-    s = decodeSave(JSON.stringify(s))!;
-    s = tap(s, 1);
-    expect(s.phone.caseId).toBe('school-b'); expect(s.phone.app).toBe('messages'); expect(s.phone.open).toBe(true);
-    expect(s.stageTaps).toBe(10);
-    expect(decodeSave(JSON.stringify(s))).not.toBeNull();
+});
+
+describe('complete journey and endless play', () => {
+  it.each(['cautious', 'mistakes', 'decline'] as const)('%s run can finish all stages and continue past a million', strategy => {
+    let s = run(strategy);
+    expect(s.finished).toBe(true);
+    expect(s.cash).toBeGreaterThanOrEqual(100000000);
+    expect(resolvedCount(s)).toBe(12);
+    expect(stageResolved(s)).toBe(3);
+    expect(s.character.name).toBe('Nur Aisha');
+    expect(s.cash).toBe(s.gross + s.ledger.reduce((sum, l) => sum + l.cents, 0));
+    s = reducer(s, { type: 'CONTINUE_PLAY' });
+    const cash = s.cash;
+    s = tap(s, 5);
+    expect(s.cash).toBe(cash + 50000);
+    expect(s.finished).toBe(false);
+    expect(s.milestoneSeen).toBe(true);
+    expect(canAdvance(s)).toBe(false);
+    expect(roundTrip(s).milestoneSeen).toBe(true);
   });
-  it('resuming a real commission preserves its receipt and prevents a second payout', () => {
-    let s = fixture('uni-a');
-    for (const id of s.order[0]) { s.progress[id].arrived = true; s.progress[id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: false }; }
-    s = reducer(s, { type: 'SAMPLE' });
-    const restored = decodeSave(JSON.stringify(s))!;
-    expect(restored.ledger.filter(l => l.id === 'uni-a-sample')).toHaveLength(1);
-    expect(reducer(restored, { type: 'SAMPLE' })).toEqual(restored);
+  it('stage advances only after all decisions and debrief, then waits at profile', () => {
+    let s = ready();
+    s.gross = 100000;
+    for (const id of s.order[0]) {
+      s.progress[id].arrived = true;
+      s.progress[id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: false, inspectedEvidence: [] } satisfies EncounterResult;
+    }
+    s.phone = { open: true, app: 'feedback', caseId: 'school-c', record: null };
+    expect(reducer(s, { type: 'ADVANCE' }).stage).toBe(0);
+    s = reducer(s, { type: 'ACK' });
+    expect(s.stage).toBe(1);
+    expect(s.briefing).toBe(true);
+    expect(s.upgrade).toBe(false);
+    expect(s.ledger).toHaveLength(1);
+    expect(tap(s).cash).toBe(s.cash);
   });
-  it('cannot earn verification retroactively by opening evidence after a decision', () => {
-    let s = fixture('school-a');
-    s = reducer(s, { type: 'RESOLVE', decision: 'decline' });
-    s = inspect(s, 'market');
-    expect(s.progress['school-a'].evidence).toEqual([]);
-    expect(s.progress['school-a'].result?.verified).toBe(false);
-  });
-  it('rejects broken saves rather than silently replacing progress', () => {
-    expect(decodeSave('{')).toBeNull();
-    expect(decodeSave(JSON.stringify({ ...createGame(), cash: -1 }))).toBeNull();
-    expect(decodeSave(JSON.stringify({ ...createGame(), stage: 99 }))).toBeNull();
-    expect(decodeSave(JSON.stringify({ ...createGame(), stageTaps: -1 }))).toBeNull();
-    expect(decodeSave(JSON.stringify({ ...createGame(), stageTaps: 5, lastResolutionTap: 6 }))).toBeNull();
-    const s = start(); s.order[0] = ['school-a', 'school-a'];
-    expect(decodeSave(JSON.stringify(s))).toBeNull();
+  it('carries the cooldown across stage advancement and pauses it on the next profile', () => {
+    let s = ready();
+    s.gross = 100000; s.cash = 300000; s.activeMs = 90000; s.stageMs = 90000;
+    for (const id of s.order[0]) {
+      s.progress[id].arrived = true;
+      s.progress[id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: false, inspectedEvidence: [] };
+    }
+    s.phone = { open: true, app: 'feedback', caseId: 'school-c', record: null };
+    s = reducer(s, { type: 'ACK' });
+    expect(s.stage).toBe(1);
+    expect(s.lastResolutionMs).toBe(90000);
+    expect(s.stageMs).toBe(0);
+    s = tick(s, EVENT_COOLDOWN_MS);
+    expect(s.activeMs).toBe(90000);
+    s = reducer(s, { type: 'BEGIN_STAGE' });
+    s = tap(s, 5);
+    expect(activeCase(s)).toBeUndefined();
+    s = roundTrip(tick(s, EVENT_COOLDOWN_MS - 1));
+    expect(activeCase(s)).toBeUndefined();
+    s = reducer(s, { type: 'TICK', ms: 1 });
+    expect(activeCase(s)).toBe('uni-a');
   });
 });

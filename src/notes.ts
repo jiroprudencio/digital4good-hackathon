@@ -1,4 +1,4 @@
-export const STAGE_DENOMINATIONS = [10, 50, 100, 1000] as const;
+export const STAGE_DENOMINATIONS = [2, 10, 50, 100] as const;
 export function noteBundle(cents: number, stage: number) {
   const denomination = STAGE_DENOMINATIONS[stage];
   const count = Math.floor(cents / (denomination * 100));

@@ -1,109 +1,135 @@
 # Scamagotchi: Road to a Million
 
-A Singapore-informed, browser-local life game. Tap to earn simulated SGD while progressing through school, university, office work and older life at home. Eight requests interrupt play. Investigate, decide, then read why the request was fraudulent or genuine.
+A Singapore-informed browser game about investigating requests as life changes. Create your character, tap to earn simulated SGD, and progress through school, tertiary education, adult life and retirement. Twelve encounters mix fraudulent requests with genuine opportunities. Scamagotchi is the recurring antagonist, lurking in the scenes and revealed behind fraudulent encounters.
 
-## Play locally
+## Run locally
 
-Requires Node.js 22.12+ or a current supported LTS release.
+Requires Node.js 22.12+ or a supported later release.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open the local address printed by Vite, normally http://127.0.0.1:5173. No accounts, API keys, real payments or external services are involved. All images, icons and game content are bundled locally. Source links in debriefs are optional external pages.
-
-For a production build:
+Open the address printed by Vite, normally http://127.0.0.1:5173.
 
 ```sh
 npm run build
 npm run preview
 ```
 
-Deploy `dist/` to a static host when ready. There is no backend to deploy. The game works without network access after its assets have loaded; it is not an installable offline PWA, and an offline fresh page load is not guaranteed.
+Deploy `dist/` to a static host. Gameplay needs no backend, account system or API key. Calls, messages, payments and contact details are simulated. The game does not send real messages, place calls or request real banking credentials. Regenerating the bundled voice recordings is a separate developer command that requires an ElevenLabs API key.
 
-## Controls and progression
+Assets are bundled locally. Gameplay can continue without a network connection once its assets are loaded; this is not an installable offline PWA, and a fresh offline page load is not guaranteed. Source links in debriefs open optional external pages.
 
-- Click the SPECIMEN note or use Enter/Space while it is focused. Every activation counts: no cooldown, hold-repeat or idle income.
-- Notes use denominations of SGD 10, 50, 100 and 1,000 across the four stages. Each full note in a tap is drawn as a separate layer in the stack (base counts 2, 4, 20 and 10). The school item bonus leaves SGD 4 or SGD 8 in change, displayed separately so the total stays exact.
-- Buy one optional upgrade per chapter to double that chapter's earnings. The genuine school purchase adds a school-only 20% bonus.
-- The first request opens automatically after five accepted taps. The next opens after five additional taps following the first resolution.
-- A pending request blocks earning, upgrades and chapter advancement. Use the phone apps to investigate, make a decision and read the outcome. Escape cannot bypass an unresolved request. Declining remains available if a payment is unaffordable. Mandatory requests, outcome reading and hidden tabs pause the clock; idle phone browsing does not.
-- Reach the chapter's lifetime-earning threshold and resolve its requests to advance automatically. Read and close the outcome before moving on. The final milestone requires **one million SGD held** and every request resolved.
-- The phone stays in the right column. Upgrades and stage progress sit below the scene. Requests dim the rest of the game and move keyboard focus to the phone until the request and outcome are addressed. On mobile, the phone is inline below the scene; incoming requests scroll it into view.
-- **Restart** opens a confirmation and an optional save download before clearing the current run.
-- In the development server, **Exit request (dev)** removes the spotlight without resolving the request. Continue testing taps, then choose **Resume request** or navigate in the phone to return to it. Reloading restores the pending request. Production builds omit this control and ignore the bypass action.
-- **Less motion** and the operating system's reduced-motion preference stop decorative animations.
+## Character and progression
 
-All monetary amounts are stored as integer cents. Deliberate encounter transactions (introductory commission, approved shift and work reward) remain; ordinary income only comes from taps. These transactions do not count toward lifetime tap earnings. Employer invoice losses stay separate from personal savings. Older saves retain their balances and gain no further idle income.
+- Choose a name or nickname, gender and one of six skin tones. Detailed pixel-art sprites reflect the choices across four life stages. Two locally bundled character sheets provide short and bob hairstyles, framed consistently for full-body views and portraits. These settings do not change earnings, difficulty or scenario outcomes.
+- Before each stage, read a profile with your role, current plans and established contacts, then press **Next**. The four stages use ages **15, 22, 35 and 65** respectively. Stage advancement is automatic once its requirements are met, but the next briefing pauses gameplay until acknowledged.
+- Reopen your profile using the header avatar. During an event, **Contacts → My Card** remains available inside the active phone.
+- Click the specimen banknotes, or use Enter/Space while the note button is focused. There is no click cooldown, passive income or offline income.
+- Base earnings are one S$2 note per tap in school, one S$10 note in tertiary, one S$50 note in adulthood and one S$100 note in retirement. The optional stage upgrade doubles earnings to S$4, S$20, S$100 and S$200 respectively, represented by two notes. There is no additional school-item multiplier. Stage savings milestones stay unchanged for a slower progression, and existing saved balances are preserved.
+- Each stage has three encounters. The run’s first request can arrive after at least five taps, once the player can afford its commitment. Later requests require both five further taps and **10 seconds of active play after closing the previous debrief**. The cooldown carries across stage transitions and pauses while reading a stage profile, handling a request, viewing an outcome or using a hidden tab. Once enough taps and savings are recorded, the next request can arrive when the active timer reaches 10 seconds. This prevents an unavoidable money shortage during a request.
+- Requests pause earning, purchases and the active-play clock. Investigate through the phone, make a decision and read the explanation. Hidden tabs and stage briefings also pause active play. Ordinary phone browsing between requests does not pause tapping.
+- Leaving a completed debrief through the phone home bar also resumes play. Older saves stuck on an ordinary phone screen are repaired on reload while preserving savings and encounter results.
+- School, tertiary and adult stages require S$1,000, S$10,000 and S$100,000 in lifetime tap earnings respectively, plus all their encounters resolved. Encounter rewards do not count toward these thresholds.
+- Holding S$1,000,000 after all twelve encounters opens the journey reflection. **Keep playing** resumes the final stage with no million-dollar cap and does not repeatedly reopen the milestone screen. The finite scenario bank does not generate new requests after completion.
+- **Restart** asks for confirmation and returns to character creation. Settings provide reduced motion, instructions and a save download.
+- Development builds include **Exit request (dev)** for testing. This does not resolve the event; returning to it or reloading restores the mandatory pause. Production builds omit the bypass.
 
-## Five themes
+Amounts use integer cents. Payments and rewards post once. Declining a request never creates debt or stops future earning. The ledger separates deliberate transactions from lifetime tap earnings.
 
-Open `http://127.0.0.1:5173/?view=themes` for five live previews, or use **Theme** in the game. Preview runs never write to your real save.
+## Scenarios and evidence
 
-| Theme | Hallmark reference | Treatment |
-| --- | --- | --- |
-| Pocket | Hum | Cream paper, yellow controls, rounded edges |
-| Ledger | Almanac | Cool paper, ruled sections, square edges |
-| Arcade | Arcade | Dark plum, amber controls, hard shadows |
-| Night shift | Dusk | Slate surfaces, sage controls, soft borders |
-| Blueprint | Cobalt | White surfaces, blue controls, cut corners |
+The order is shuffled once per stage and retained in the save. The game does not announce the scam/genuine distribution. This is a usability prototype, not a validated assessment: repeated players may learn the authored cases.
 
-[Hallmark](https://github.com/Nutlope/hallmark) is installed in the user's Codex skills directory. Theme materials are adapted to the game; browser-default font sizes remain throughout. Optional, locally bundled Google Font pairings change families only; Browser default remains available. The original pixel scenes remain. The illustrated SGD notes use Portrait Series colour/layout cues, a simplified cartoon portrait and a prominent SPECIMEN mark. They are original SVG artwork, not scanned currency. Reference: [MAS circulation notes](https://www.mas.gov.sg/currency/circulation-currency/circulation-currency-notes).
+| Stage | Fraudulent requests | Genuine opportunity | Independent evidence |
+| --- | --- | --- | --- |
+| School | Concert-ticket reservation; trading-card sale | A classmate’s card exchange | Saved organiser contact and the original photo owner; confirmed meetup with inspection |
+| Tertiary | Replacement tuition-payment account; internship onboarding deposit | Internship following a real application and interview | Saved finance/employer contacts and archived application records |
+| Adult | Boss impersonation requesting gift cards; parcel redelivery phishing | A previously discussed agenda task from Ethan | Expanded email details, existing work/order records and saved-contact calls |
+| Senior | Government investigation transfer; fake friend requesting a loan | A friend coordinating a community-class contribution | Independently initiated calls through established official/friend contacts |
 
-## Font comparisons and app references
+All characters, conversations, amounts and institution-specific events are authored fiction. The IMDA role is fictional and does not imply endorsement. Meranti University and Linden Studio are fictional institutions.
 
-Pocket and Silkscreen + IBM Plex Sans are the defaults. Open `http://127.0.0.1:5173/?view=fonts` to compare Silkscreen with IBM Plex Sans, DM Sans, Inter, Nunito Sans and Source Sans 3. Select a pairing under Settings to apply it. Life-stage labels also use Silkscreen. All fonts are bundled locally under their included OFL licenses. `artifacts/silkscreen-pairings.png` is a standalone type specimen, not an application screenshot; reproduce it with `python scripts/render-font-pairings.py` (Pillow required).
+Research references and the **6 November 2026** review date live beside each encounter in `src/content.ts` and are available in its debrief. Sources include Singapore Police Force, ScamShield, NUS fee-payment guidance and SingPost security guidance. The tuition and internship narratives adapt documented scam mechanisms; the NUS source establishes legitimate payment processes rather than documenting the fictional incident.
 
-The desktop game fills the available viewport width and height with three columns. The main game page does not scroll on desktop; compact settings live in a dropdown, scenery scales to the remaining height, and phone content scrolls internally. Target display: 3860 x 2160, including scaled laptop viewports. Smaller mobile viewports stack the controls. The phone body uses the iPhone 18 Pro Max width-to-height ratio of 78:163.4, based on [Apple specifications](https://support.apple.com/en-lamr/148591), with a maximum width of 440 CSS pixels and a smaller size when available height requires it. The money and scene columns share the remaining width. The phone uses system-style typography independently of the game's selected pairing.
+Verification requires opening decisive independent evidence before an appropriate decision. Replying to the suspicious sender does not substitute for a saved-contact check. A matching email domain, familiar voice, polished receipt or small initial charge is not sufficient proof. The mock lookalike address is simulated; the game does not claim that arbitrary government domains can be registered. PayNow itself is not treated as suspicious.
 
-Phone references reviewed 4 November 2026:
+Outcomes explain what happened, evidence checked or missed, financial effects and one useful practice habit. Declining a verified personal contribution remains a valid choice. The results are not a “scam-proof” score.
 
-- [Telegram for iOS](https://apps.apple.com/us/app/telegram-messenger/id686449807) and [Telegram's iOS design update](https://telegram.org/blog/comments-in-video-chats-threads-for-bots): chat headers, blue navigation, avatars, conversation rows and timestamped bubbles.
-- [Gmail for iOS](https://apps.apple.com/us/app/gmail-email-by-google/id422689480): rounded search, inbox rows, sender details and plain mail reading surfaces.
-- [Apple's Phone guide](https://support.apple.com/en-ae/guide/iphone/iph3c993cbc/ios): Recents, Contacts, separate incoming/outgoing records and saved-contact routes.
+## Phone and frontend
 
-Requests live in Notification Centre, reached by swiping down from the phone status bar, clicking that bar, or using the notification bell. Notifications open their original conversations and remain available across stages and reloads. The home screen contains only apps.
+Desktop uses a full-width three-column layout: money, scene and a fixed phone. During an event, the background and header dim while the phone and decision card remain active. Decisions appear immediately left of the phone. On narrow screens the layout stacks and the decision card follows the phone. Phone content scrolls internally; responsive and zoomed layouts must keep controls reachable.
 
-These are simulated app-inspired screens, not embedded clients or pixel-certified replicas. During an event, decisions appear in a floating card immediately left of the phone, above the darkened scene, with a solid primary action, an outlined decline button and a red-outlined report button. The card stays available while checking other apps. Both phone and decision card share the keyboard focus boundary. On narrow screens the card follows the phone so it cannot cover navigation. Browser has been removed; marketplace checks use saved support contacts and campus records appear in Mail. Old saves migrate to those routes without losing history.
+The phone contains:
 
-## Content and learning design
+- **Messages:** Telegram-inspired conversations and ordinary reply controls.
+- **Mail:** Gmail-inspired inbox and message screens with a working sender-details disclosure.
+- **Calls:** iOS-inspired incoming/active calls, optional voice-message playback, accessible text transcripts and replay from call history.
+- **Contacts:** established contacts, outbound calls and the player’s My Card.
+- **Bank:** simulated balance and posted transaction history.
+- **Notification Centre:** swipe down or activate the top status area; notification cards reopen their originating request.
 
-Each chapter contains a fraudulent and a legitimate encounter, shuffled once per run. The game does not announce that distribution. This pairing makes the prototype useful for usability testing, but it is not a rigorous assessment: players may infer the pattern.
+Declining or ending an incoming call creates a follow-up message with the recording and a transcript disclosure; it does not automatically decide whether the request is fraudulent. All three call encounters, including the genuine request, use the same audio treatment. Playback starts only when the player presses Play and stops on navigation, hang-up, hidden tabs or another recording starting. If audio cannot load, its transcript remains available. There are no microphone permissions, real calls or live AI conversations.
 
-| Chapter | Situation | Independent route |
-| --- | --- | --- |
-| School | Second-hand headphone purchase | Saved marketplace support contact, supported checkout and transaction safeguards |
-| University | Flexible student work | Saved university mail bulletin and independently obtained university contact |
-| Office | Supplier account change | Previously saved vendor contact; incoming reassurance is a different route |
-| Home | Family request in an existing chat | Saved family contact, purpose and payment details |
+### ElevenLabs voice messages
 
-Verification credit requires opening decisive evidence before a compatible decision. Guessing or rejecting everything earns no verification credit. Declining a genuine family request after checking is a valid safe choice. A real initial task commission does not establish that later deposit demands are legitimate. PayNow is not treated as inherently suspicious.
+The bundled recordings use **Kopi Gao - Expressive Singlish**, voice ID `i9SZdx1xJqqryIiaFdmN`, with its verified `eleven_multilingual_v2` TTS model. Voice settings live in `scripts/elevenlabs-voice.json`. The three MP3s cover the investigation impersonator, fake friend and genuine community-class call.
 
-Scamagotchi's role is revealed after fraudulent requests resolve. Outcomes explain the evidence, losses, missed opportunities and a practice habit; no “scam-proof” score is given.
+```sh
+# Generate missing/changed clips; requires ELEVENLABS_API_KEY locally.
+npm run audio:generate
+# Verify script/config fingerprints and audio integrity without API calls.
+npm run audio:check
+```
 
-Sources and review date **4 November 2026** live beside each encounter in `src/content.ts` and appear in its debrief. They include ScamShield, Singapore Police Force, Carousell Singapore, NUS's Student Work Scheme and OCBC business security guidance. Dialogue, people, institutions, companies, amounts and approval policies in the game are authored fiction.
+Set `ELEVENLABS_API_KEY` in the gitignored `.env.local` or the shell environment. Never use a `VITE_` prefix or put the key in browser code. The Node-only generator uses the official ElevenLabs SDK and sends only authored scenario dialogue, with speaker labels and player-name placeholders removed. Player names and save data are never uploaded. The deployed game only loads local MP3 files and makes no ElevenLabs requests.
+
+Generated filenames include a script/config hash. Matching clips are reused without API requests or credit use; changing a script or voice configuration regenerates only affected clips. `--force` explicitly regenerates everything. Generation has no automatic retry after an ambiguous API failure. The manifest records the source script, voice, model, file hash and generation time. Production builds run `audio:check` first and fail if recordings are missing, corrupted or stale. If a script changes without regeneration, playback is disabled for that stale clip while the new transcript stays available.
+
+API reference: [Create speech](https://elevenlabs.io/docs/api-reference/text-to-speech/convert). Voice lookup: [List shared voices](https://elevenlabs.io/docs/api-reference/voices/voice-library/get-shared).
+
+The interfaces are app-inspired simulations, not embedded applications or exact replicas. The transcript overlay and game decision card are deliberate game adaptations. Familiar branding is not an authenticity verdict.
+
+Four locally bundled generated pixel-art backgrounds provide classroom, student room, office and HDB living-room settings. The approved cream-and-plum Scamagotchi design is rendered as a pixelated local asset. Player and contact characters use generated sprite atlases clipped inside SVG frames. The S$2, S$10, S$50 and S$100 specimen notes use a generated pixel-art atlas inspired by the current SGD Portrait Series: right-hand portrait, pale left panel, engraved numerals, denomination colours and clear SPECIMEN / GAME NOTE lettering. Official MAS references and generation details are recorded in `public/art/sources.json`. SVG framing clips each note without modifying the source pixels. Decorative movement respects reduced-motion settings.
+
+Pocket with Silkscreen + IBM Plex Sans is the default. Phone content uses readable system-style type. Font sizes follow browser defaults rather than a custom fixed-size typography scale.
+
+Design comparison routes remain available:
+
+- `/?view=themes`: five live theme previews.
+- `/?view=fonts`: Silkscreen paired with IBM Plex Sans, DM Sans, Inter, Nunito Sans or Source Sans 3.
+- `/?theme=ledger&font=silk-inter`: apply a supported theme/font using URL parameters.
+- `/?preview`: isolated preview state that does not overwrite the saved run.
+
+Settings no longer contain theme/font selectors. Fonts are bundled under their included OFL licences in `public/fonts/`. The phone uses the user-selected [black iPhone wallpaper from iClarified](https://www.iclarified.com/files/ios/iClarified-iPhone-18-Pro-Wallpaper/iClarified-iPhone-18-Pro-Wallpaper-Black-Lock-Screen.jpg), with a dark overlay for legibility. Asset provenance is recorded separately with the bundled artwork.
 
 ## Implementation map
 
-- `src/game.ts`: pure reducer, economy, encounter scheduling, verification, save validation and transaction effects.
-- `src/content.ts`: all eight encounter variants, evidence, outcomes, sources and stage settings.
-- `src/Phone.tsx`: five simulated apps (Messages, Mail, Calls, Contacts and Bank), persistent conversations, call transcripts, ledger, explicit confirmations and debriefs.
-- `src/Scene.tsx`: four original layered pixel-style SVG scenes, ageing avatars, specimen SGD notes and mascot.
-- `src/themes.ts`, `src/tokens.css`, `src/ThemeGallery.tsx`: five selectable materials and isolated live previews.
-- `src/fonts.ts`, `src/fonts.css`, `src/FontGallery.tsx`: five optional font pairings and a comparison page. Font sources and OFL licenses are in `public/fonts/`.
-- `src/App.tsx`: clicker layout, onboarding, stage progression, accessible dialogs and final reflection.
-- CSS Modules: responsive layouts, motion and component styles. No remote fonts or asset CDNs.
+| File | Responsibility |
+| --- | --- |
+| `src/game.ts` | Pure reducer, tap economy, scheduling, call state, decisions, persistence validation and milestone continuation |
+| `src/content.ts` | Twelve scenarios, independent evidence, consequences, sources and stage settings |
+| `src/profiles.ts` | Character options, stage contexts and established contacts |
+| `src/Character.tsx` | Customisable, ageing pixel-art sprites and portrait framing |
+| `src/Phone.tsx` | Simulated apps, notifications, sender details, contacts, transcripts and debriefs |
+| `src/VoicemailAudio.tsx`, `src/voicemails.ts` | Optional local audio playback, transcript fallback and stale-recording protection |
+| `src/voicemailScripts.ts`, `scripts/generate-voicemails.mjs` | Anonymous authored speech scripts and cached ElevenLabs generation |
+| `src/Scene.tsx` | Bundled scenery, recurring antagonist and SVG banknote stacks |
+| `src/App.tsx` | Character creation, stage briefings, clicker layout, settings and reflection |
+| `src/themes.ts`, `src/fonts.ts` | Theme/font metadata and comparison routes |
+| `artifacts/design-review-2026-11-06/` | Approval mockups and research/prompt specification |
 
-The UI/UX designer subagent created the scene artwork and informed navigation, evidence presentation, accessibility and post-decision feedback.
+## Saves and privacy
 
-## Saving and privacy
+The current save key is **`scamagotchi.life.v2`**. Version 1 saves use a separate key and are not migrated into the new twelve-scenario run; the old entry is not overwritten by starting a version 2 game. The current UI reads version 2 only.
 
-The save is browser-local under `scamagotchi.life.v1`. Important actions save immediately after the state update; ordinary earnings save every second and on page exit. Resuming never grants offline earnings. Repeated outcome actions cannot repeat a payment, commission or reward.
+State changes are saved to LocalStorage after the React state update. Payments, rewards and completed decisions are persisted together, and repeating a resolved action does not duplicate a transaction. Reloading restores the shuffled order, character, records and current mandatory request. No offline earnings accrue.
 
-Reset requires an in-game confirmation. You can download a JSON copy first. Unreadable saves are preserved until you choose to start fresh; the interface offers a backup. JSON import is not implemented. Clearing browser storage removes the saved run. Different browsers and origins have separate saves; there is no cloud sync or telemetry.
+Unreadable current saves prompt a backup before starting fresh. Save download is available; importing a JSON save is not implemented. Clearing browser storage removes local progress. Different origins and browsers have separate saves. There is no cloud sync or telemetry.
 
-## Checks
+## Validation
 
 ```sh
 npm test
@@ -111,20 +137,12 @@ npm run build
 npm run test:e2e
 ```
 
-The reducer suite covers safe and mistaken decisions, independent evidence, insufficient funds, employer accounting, paused time, rapid taps, forced encounters, zero idle income, save migration and complete cautious/mistake-heavy/decline-everything journeys.
+The unit suite covers all twelve cautious and mistaken paths, source navigation, pre-decision verification snapshots, call follow-ups, insufficient funds, briefings, rapid taps, paused clocks, save validation and complete cautious/mistake-heavy/decline-all journeys continuing beyond one million. Banknote tests compare each stack with actual tap earnings.
 
-The Playwright suite covers desktop and mobile layouts, all five themes, keyboard earning, all eight investigation flows, confirmations, reloads, reduced motion and continued play after going offline. It currently uses installed Microsoft Edge (`channel: 'msedge'`). On another machine, install Chromium using `npx playwright install chromium` and remove that channel setting from `playwright.config.ts`.
+Playwright covers character creation, stage profiles, phone navigation, sender details, calls, complete encounter flows, reloads, responsiveness and continued play. It uses installed Microsoft Edge through `channel: 'msedge'` and a separate local origin on port 5174 so the user's live preview on 5173 remains available. Override the test port with `PLAYWRIGHT_PORT` when needed. For another environment, install a supported Playwright browser and adjust `playwright.config.ts`.
 
-**Validation status:** production build and 83 unit tests pass. Hallmark static checking finds no failures; white app surfaces follow the requested iOS/Gmail references. Its static contrast resolver does not distinguish every nested theme; visual browser review is still pending. A QA subagent reviewed the new rules, tests and interface code. Browser execution, screenshots and visual review remain blocked by a saved browser permission setting; the Playwright suite is prepared but has not run. No first-time human playtests have been conducted.
+Latest validation: **103 unit tests**, **7 focused audio browser tests**, the 10-second cooldown pause/reload regression, and real-MP3 playback checks for all three clips (21.36s, 17.88s and 16.53s, with no third-party playback requests). Current unit simulations cover all three complete strategies under the slower tap rates. All 48 character variants were checked as full-body sprites and portraits without clipping. The four note denominations were also checked at base/upgraded counts on desktop and mobile. Production builds verify audio integrity before compiling. Screenshots in `artifacts/qa/` are isolated Edge captures; the live Chrome layout was inspected separately. No first-time human playtests have been completed.
 
 ## First playtest
 
-Use three to five first-time players. Do not explain which app contains decisive evidence. Observe whether they:
-
-1. Understand that an incoming request pauses tapping until a decision.
-2. Distinguish replying from independently checking.
-3. Find positive evidence for genuine opportunities.
-4. Explain which evidence changed their decision.
-5. Understand personal versus employer losses and how to move to the next chapter.
-
-Record total elapsed time separately from the active earning clock. The 8–12 minute target is provisional. Fix confusing navigation before adding AI, voice, leaderboards or more encounters.
+Test with three to five first-time players without directing them to the decisive app. Observe whether they can reopen their profile, distinguish a reply from an independent call, recognise genuine opportunities and explain what changed their decision. Record total elapsed time separately from active tapping time. The earlier 8–12 minute target predates the slower S$2 / S$10 / S$50 / S$100 tap economy and must be remeasured. Upgrades halve the tap count needed for further earnings; the existing stage and million-dollar milestones intentionally take longer.

@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "id": "home-a",
+      "durationSeconds": 21.36,
+      "played": true,
+      "readyState": 4
+    },
+    {
+      "id": "home-b",
+      "durationSeconds": 17.88,
+      "played": true,
+      "readyState": 4
+    },
+    {
+      "id": "home-c",
+      "durationSeconds": 16.53,
+      "played": true,
+      "readyState": 4
+    }
+  ],
+  "thirdPartyRequests": 0
+}

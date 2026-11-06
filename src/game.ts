@@ -1,88 +1,99 @@
 import { CASES, ENCOUNTERS, STAGES } from './content';
 import type { Decision, PhoneApp } from './content';
+import { DEFAULT_CHARACTER, GENDERS, normaliseCharacter, SKIN_TONES } from './profiles';
+import type { Character } from './profiles';
 
-export const SAVE_KEY = 'scamagotchi.life.v1';
-export interface EncounterResult { decision: Decision; verified: boolean; unsafe: boolean; personalDelta: number; employerLoss: number; missed: boolean }
-export interface Progress { arrived: boolean; read: boolean; evidence: string[]; samplePaid: boolean; result: EncounterResult | null }
+export const SAVE_KEY = 'scamagotchi.life.v2';
+export const LEGACY_SAVE_KEY = 'scamagotchi.life.v1';
+export const EVENT_COOLDOWN_MS = 10000;
+export interface EncounterResult { decision: Decision; verified: boolean; unsafe: boolean; personalDelta: number; employerLoss: number; missed: boolean; inspectedEvidence: string[] }
+export interface Progress { arrived: boolean; read: boolean; evidence: string[]; samplePaid: boolean; result: EncounterResult | null; callStatus: 'ringing' | 'answered' | 'declined' | null }
 export interface LedgerEntry { id: string; title: string; cents: number; stage: number; caseId?: string }
 export interface CallRecord { caseId: string; evidenceId: string }
 export interface GameState {
-  version: 1; started: boolean; stage: number; cash: number; gross: number; upgrade: boolean;
-  stageMs: number; activeMs: number; lastResolutionMs: number | null; remainder: number;
-  stageTaps: number; lastResolutionTap: number | null;
-  lastTap: number; hidden: boolean; finished: boolean; reducedMotion: boolean;
+  version: 2; started: boolean; character: Character; briefing: boolean; stage: number;
+  cash: number; gross: number; upgrade: boolean; stageMs: number; activeMs: number;
+  lastResolutionMs: number | null; remainder: number; stageTaps: number; lastResolutionTap: number | null;
+  lastTap: number; hidden: boolean; finished: boolean; milestoneSeen: boolean; reducedMotion: boolean;
   order: string[][]; progress: Record<string, Progress>; ledger: LedgerEntry[]; calls: CallRecord[];
   phone: { open: boolean; app: PhoneApp; caseId: string | null; record: string | null };
 }
 export type Action =
   | { type: 'RESET'; state: GameState }
-  | { type: 'START' } | { type: 'TICK'; ms: number } | { type: 'TAP'; now: number }
+  | { type: 'START'; character?: Partial<Character> } | { type: 'BEGIN_STAGE' }
+  | { type: 'CONTINUE_PLAY' }
+  | { type: 'TICK'; ms: number } | { type: 'TAP'; now: number }
   | { type: 'UPGRADE' } | { type: 'ADVANCE' } | { type: 'HIDDEN'; hidden: boolean }
   | { type: 'PHONE'; open: boolean } | { type: 'APP'; app: PhoneApp; list?: boolean }
   | { type: 'CASE'; id: string } | { type: 'INSPECT'; id: string } | { type: 'BACK' }
+  | { type: 'CALL_ANSWER' } | { type: 'CALL_DECLINE' }
   | { type: 'SAMPLE' } | { type: 'RESOLVE'; decision: Decision } | { type: 'ACK' }
   | { type: 'MOTION'; reduced: boolean } | { type: 'DEV_EXIT' };
 
 export function createGame(random: () => number = Math.random): GameState {
   return {
-    version: 1, started: false, stage: 0, cash: 5000, gross: 0, upgrade: false,
-    stageMs: 0, activeMs: 0, lastResolutionMs: null, remainder: 0, lastTap: -1000,
-    stageTaps: 0, lastResolutionTap: null,
-    hidden: false, finished: false, reducedMotion: false,
+    version: 2, started: false, character: { ...DEFAULT_CHARACTER }, briefing: false,
+    stage: 0, cash: 5000, gross: 0, upgrade: false, stageMs: 0, activeMs: 0,
+    lastResolutionMs: null, remainder: 0, lastTap: -1000, stageTaps: 0, lastResolutionTap: null,
+    hidden: false, finished: false, milestoneSeen: false, reducedMotion: false,
     order: STAGES.map((_, stage) => {
       const ids = ENCOUNTERS.filter(e => e.stage === stage).map(e => e.id);
-      return random() < .5 ? ids : ids.reverse();
+      for (let i = ids.length - 1; i > 0; i--) {
+        const draw = random();
+        const j = Math.max(0, Math.min(i, Math.floor((Number.isFinite(draw) ? draw : 0) * (i + 1))));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      return ids;
     }),
-    progress: Object.fromEntries(ENCOUNTERS.map(e => [e.id, { arrived: false, read: false, evidence: [], samplePaid: false, result: null }])),
+    progress: Object.fromEntries(ENCOUNTERS.map(e => [e.id, { arrived: false, read: false, evidence: [], samplePaid: false, result: null, callStatus: null }])),
     ledger: [{ id: 'start', title: 'Starting pocket money', cents: 5000, stage: 0 }], calls: [],
     phone: { open: false, app: 'home', caseId: null, record: null },
   };
 }
-export function rates(s: GameState) {
-  const bonus = s.stage === 0 && s.progress['school-b'].result?.decision === 'proceed' ? 1.2 : 1;
-  const multiplier = (s.upgrade ? 2 : 1) * bonus;
-  return { tap: Math.round(STAGES[s.stage].tap * 100 * multiplier) };
-}
-export const resolvedCount = (s: GameState) => Object.values(s.progress).filter(p => p.result).length;
+export const rates = (s: GameState) => ({ tap: STAGES[s.stage].tap * 100 * (s.upgrade ? 2 : 1) });
+export const resolvedCount = (s: GameState) => ENCOUNTERS.filter(e => s.progress[e.id]?.result).length;
 export const stageResolved = (s: GameState) => s.order[s.stage].filter(id => s.progress[id].result).length;
-export const canAdvance = (s: GameState) => stageResolved(s) === 2 && (s.stage === 3 ? s.cash >= 100000000 && resolvedCount(s) === 8 : s.gross >= STAGES[s.stage].gate * 100);
+export const canAdvance = (s: GameState) => stageResolved(s) === s.order[s.stage].length && (s.stage === 3 ? !s.milestoneSeen && s.cash >= 100000000 && resolvedCount(s) === ENCOUNTERS.length : s.gross >= STAGES[s.stage].gate * 100);
 export const unreadCount = (s: GameState) => Object.values(s.progress).filter(p => p.arrived && !p.read).length;
 export const activeCase = (s: GameState) => s.order[s.stage].find(id => s.progress[id].arrived && !s.progress[id].result);
-const canEarn = (s: GameState) => s.started && !s.phone.open && !s.hidden && !s.finished;
-// The phone is always visible; open tracks an encounter/outcome pause.
-const navigationPauses = (s: GameState) => s.phone.open || Boolean(activeCase(s));
-
+export const encounterChannel = (s: GameState, id: string): 'messages' | 'mail' | 'calls' => CASES[id].channel === 'calls' && s.progress[id].callStatus === 'declined' ? 'messages' : CASES[id].channel;
+const canEarn = (s: GameState) => s.started && !s.briefing && !s.phone.open && !s.hidden && !s.finished;
+// Only an unresolved request keeps ordinary phone browsing modal. Leaving a
+// resolved debrief must release its pause, including through the Home button.
+const navigationPauses = (s: GameState) => Boolean(activeCase(s));
 function advanceIfReady(s: GameState): GameState {
   if (!canEarn(s) || !canAdvance(s)) return s;
   if (s.stage === 3) return { ...s, finished: true };
-  return { ...s, stage: s.stage + 1, upgrade: false, stageMs: 0, lastResolutionMs: null, stageTaps: 0, lastResolutionTap: null, remainder: 0, phone: { open: false, app: 'home', caseId: null, record: null } };
+  return { ...s, stage: s.stage + 1, briefing: true, upgrade: false, stageMs: 0, stageTaps: 0, lastResolutionTap: null, remainder: 0, phone: { open: false, app: 'home', caseId: null, record: null } };
 }
-
 function queue(s: GameState): GameState {
   if (activeCase(s)) return s;
-  const ids = s.order[s.stage];
-  const next = ids.find(id => !s.progress[id].arrived);
+  const next = s.order[s.stage].find(id => !s.progress[id].arrived);
   if (!next) return s;
   const due = s.lastResolutionTap === null ? 5 : s.lastResolutionTap + 5;
-  if (s.stageTaps < due) return s;
-  return { ...s, progress: { ...s.progress, [next]: { ...s.progress[next], arrived: true, read: true } }, phone: { open: true, app: CASES[next].channel, caseId: next, record: null } };
+  // Do not trap a player inside a mandatory payment event they could not afford.
+  // Investigation and declining are always free; purchases pause once it arrives.
+  if (s.stageTaps < due || s.cash < CASES[next].cost * 100 || (s.lastResolutionMs !== null && s.activeMs - s.lastResolutionMs < EVENT_COOLDOWN_MS)) return s;
+  return { ...s, progress: { ...s.progress, [next]: { ...s.progress[next], arrived: true, read: true, callStatus: CASES[next].channel === 'calls' ? 'ringing' : null } }, phone: { open: true, app: CASES[next].channel, caseId: next, record: null } };
 }
-
 export function reducer(s: GameState, a: Action): GameState {
   switch (a.type) {
     case 'RESET': return a.state;
-    case 'START': return { ...s, started: true };
+    case 'START': return s.started ? s : { ...s, started: true, character: normaliseCharacter(a.character), briefing: true };
+    case 'BEGIN_STAGE': return s.started && s.briefing ? { ...s, briefing: false } : s;
+    case 'CONTINUE_PLAY': return s.finished ? { ...s, finished: false, milestoneSeen: true } : s;
     case 'HIDDEN': return { ...s, hidden: a.hidden };
     case 'MOTION': return { ...s, reducedMotion: a.reduced };
     case 'DEV_EXIT': return import.meta.env.DEV && s.phone.open ? { ...s, phone: { ...s.phone, open: false } } : s;
     case 'TICK': {
       if (!canEarn(s) || !Number.isFinite(a.ms) || a.ms <= 0) return s;
       const ms = Math.min(1000, Math.floor(a.ms));
-      return advanceIfReady({ ...s, stageMs: s.stageMs + ms, activeMs: s.activeMs + ms });
+      return advanceIfReady(queue({ ...s, stageMs: s.stageMs + ms, activeMs: s.activeMs + ms }));
     }
     case 'TAP': {
       if (!canEarn(s) || !Number.isFinite(a.now)) return s;
       const cents = rates(s).tap;
+      if (!Number.isSafeInteger(s.cash + cents) || !Number.isSafeInteger(s.gross + cents)) return s;
       return advanceIfReady(queue({ ...s, cash: s.cash + cents, gross: s.gross + cents, lastTap: a.now, stageTaps: s.stageTaps + 1 }));
     }
     case 'UPGRADE': {
@@ -101,7 +112,7 @@ export function reducer(s: GameState, a: Action): GameState {
     case 'APP': return { ...s, phone: { ...s.phone, open: navigationPauses(s), app: a.app, record: a.list && (a.app === 'messages' || a.app === 'mail') ? 'list' : null } };
     case 'CASE': {
       if (!s.progress[a.id]?.arrived) return s;
-      return { ...s, progress: { ...s.progress, [a.id]: { ...s.progress[a.id], read: true } }, phone: { open: navigationPauses(s), app: CASES[a.id].channel, caseId: a.id, record: null } };
+      return { ...s, progress: { ...s.progress, [a.id]: { ...s.progress[a.id], read: true } }, phone: { open: navigationPauses(s), app: encounterChannel(s, a.id), caseId: a.id, record: null } };
     }
     case 'BACK': return { ...s, phone: { ...s.phone, open: navigationPauses(s), app: 'home', record: null } };
     case 'INSPECT': {
@@ -114,46 +125,60 @@ export function reducer(s: GameState, a: Action): GameState {
       const calls = e.call && !s.calls.some(c => c.caseId === id && c.evidenceId === e.id) ? [...s.calls, { caseId: id, evidenceId: e.id }] : s.calls;
       return { ...s, progress: { ...s.progress, [id]: { ...p, evidence } }, calls, phone: { ...s.phone, open: navigationPauses(s), record: e.id } };
     }
-    case 'SAMPLE': {
+    case 'CALL_ANSWER':
+    case 'CALL_DECLINE': {
       const id = s.phone.caseId;
-      if (!s.phone.open || id !== 'uni-a' || !s.progress[id].arrived || s.progress[id].samplePaid || s.progress[id].result) return s;
-      return { ...s, cash: s.cash + 5000, progress: { ...s.progress, [id]: { ...s.progress[id], samplePaid: true } }, ledger: [...s.ledger, { id: `${id}-sample`, title: 'Introductory task commission', cents: 5000, stage: 1, caseId: id }] };
+      if (!id || CASES[id].channel !== 'calls' || !s.progress[id].arrived || s.progress[id].result) return s;
+      const status = s.progress[id].callStatus;
+      if (a.type === 'CALL_ANSWER' ? status !== 'ringing' : status !== 'ringing' && status !== 'answered') return s;
+      const declined = a.type === 'CALL_DECLINE';
+      return { ...s, progress: { ...s.progress, [id]: { ...s.progress[id], callStatus: declined ? 'declined' : 'answered' } }, phone: { ...s.phone, open: true, app: declined ? 'messages' : 'calls', record: null } };
     }
+    // Legacy action retained to make old event handlers harmless after the scenario replacement.
+    case 'SAMPLE': return s;
     case 'RESOLVE': {
       const id = s.phone.caseId;
-      if (!s.phone.open || !id || !s.progress[id].arrived || s.progress[id].result) return s;
-      const e = CASES[id], p = s.progress[id];
-      const paid = a.decision === 'proceed';
+      if (!s.phone.open || !id || !s.progress[id].arrived || s.progress[id].result || s.progress[id].callStatus === 'ringing' || !['proceed', 'decline', 'report'].includes(a.decision)) return s;
+      const e = CASES[id], p = s.progress[id], paid = a.decision === 'proceed';
       if (paid && s.cash < e.cost * 100) return s;
-      let delta = paid ? -e.cost * 100 : 0;
-      if (paid && id === 'uni-b') delta += 100000;
-      if (paid && id === 'office-b') delta += 1000000;
-      const unsafe = e.scam && paid;
-      const result: EncounterResult = { decision: a.decision, verified: p.evidence.includes(e.decisive) && (e.scam ? !paid : a.decision !== 'report'), unsafe, personalDelta: delta, employerLoss: id === 'office-a' && paid ? 5000 : 0, missed: !e.scam && !paid && e.stage !== 3 };
+      const delta = paid ? ((e.reward ?? 0) - e.cost) * 100 : 0;
+      const result: EncounterResult = { decision: a.decision, verified: p.evidence.includes(e.decisive) && (e.scam ? !paid : a.decision !== 'report'), unsafe: e.scam && paid, personalDelta: delta, employerLoss: paid ? e.employerLoss ?? 0 : 0, missed: !e.scam && !paid && e.stage !== 3, inspectedEvidence: [...p.evidence] };
       const ledger = delta ? [...s.ledger, { id: `${id}-result`, title: e.title, cents: delta, stage: e.stage, caseId: id }] : s.ledger;
-      return { ...s, cash: s.cash + delta, progress: { ...s.progress, [id]: { ...p, result } }, ledger, lastResolutionMs: s.stageMs, lastResolutionTap: s.stageTaps, phone: { ...s.phone, app: 'feedback', record: null } };
+      // activeMs cannot advance while the debrief is open. Using the global clock
+      // also carries the between-event cooldown through a new stage's briefing.
+      return { ...s, cash: s.cash + delta, progress: { ...s.progress, [id]: { ...p, result } }, ledger, lastResolutionMs: s.activeMs, lastResolutionTap: s.stageTaps, phone: { ...s.phone, app: 'feedback', record: null } };
     }
-    case 'ACK': return activeCase(s) ? s : advanceIfReady({ ...s, phone: { ...s.phone, open: false, app: 'home', record: null } });
+    case 'ACK': {
+      if (activeCase(s)) return s;
+      const closingOutcome = s.phone.open && s.phone.caseId !== null && Boolean(s.progress[s.phone.caseId].result);
+      return advanceIfReady({ ...s, lastResolutionMs: closingOutcome ? s.activeMs : s.lastResolutionMs, phone: { ...s.phone, open: false, app: 'home', record: null } });
+    }
   }
 }
-
 export function decodeSave(raw: string): GameState | null {
   try {
     const s = JSON.parse(raw) as GameState;
-    const apps = ['home', 'notifications', 'messages', 'mail', 'calls', 'contacts', 'bank', 'browser', 'feedback'];
-    if (!s || s.version !== 1 || !Number.isInteger(s.stage) || s.stage < 0 || s.stage > 3) return null;
-    for (const n of ['cash', 'gross', 'activeMs', 'stageMs', 'remainder'] as const) if (!Number.isSafeInteger(s[n]) || s[n] < 0) return null;
-    if (s.remainder > 999 || typeof s.started !== 'boolean' || typeof s.upgrade !== 'boolean' || typeof s.finished !== 'boolean' || typeof s.reducedMotion !== 'boolean') return null;
+    const apps = ['home', 'notifications', 'messages', 'mail', 'calls', 'contacts', 'bank', 'feedback', 'profile'];
+    if (!s || s.version !== 2 || !Number.isInteger(s.stage) || s.stage < 0 || s.stage >= STAGES.length) return null;
+    for (const n of ['cash', 'gross', 'activeMs', 'stageMs', 'remainder', 'stageTaps'] as const) if (!Number.isSafeInteger(s[n]) || s[n] < 0) return null;
+    for (const k of ['started', 'briefing', 'upgrade', 'finished', 'milestoneSeen', 'reducedMotion'] as const) if (typeof s[k] !== 'boolean') return null;
+    if (s.remainder !== 0 || (s.briefing && !s.started)) return null;
+    if (!s.character || typeof s.character.name !== 'string' || !s.character.name.trim() || Array.from(s.character.name).length > 24 || !GENDERS.some(g => g.value === s.character.gender) || !Number.isInteger(s.character.skinTone) || s.character.skinTone < 0 || s.character.skinTone >= SKIN_TONES.length) return null;
     if (!s.phone || typeof s.phone.open !== 'boolean' || !apps.includes(s.phone.app) || (s.phone.caseId !== null && !CASES[s.phone.caseId])) return null;
-    if (s.lastResolutionMs !== null && (!Number.isSafeInteger(s.lastResolutionMs) || s.lastResolutionMs < 0 || s.lastResolutionMs > s.stageMs)) return null;
-    if (!Array.isArray(s.order) || s.order.length !== 4 || !s.order.every((ids, i) => Array.isArray(ids) && ids.length === 2 && new Set(ids).size === 2 && ids.every(id => CASES[id]?.stage === i))) return null;
-    if (!s.progress || !ENCOUNTERS.every(e => {
+    if (s.lastResolutionMs !== null && (!Number.isSafeInteger(s.lastResolutionMs) || s.lastResolutionMs < 0 || s.lastResolutionMs > s.activeMs)) return null;
+    if (s.lastResolutionTap !== null && (!Number.isSafeInteger(s.lastResolutionTap) || s.lastResolutionTap < 0 || s.lastResolutionTap > s.stageTaps)) return null;
+    if (!Array.isArray(s.order) || s.order.length !== STAGES.length || !s.order.every((ids, i) => Array.isArray(ids) && ids.length === ENCOUNTERS.filter(e => e.stage === i).length && new Set(ids).size === ids.length && ids.every(id => CASES[id]?.stage === i))) return null;
+    if (!s.progress || Object.keys(s.progress).length !== ENCOUNTERS.length || !ENCOUNTERS.every(e => {
       const p = s.progress[e.id];
-      if (!p || typeof p.arrived !== 'boolean' || typeof p.read !== 'boolean' || typeof p.samplePaid !== 'boolean' || !Array.isArray(p.evidence) || !p.evidence.every(id => e.evidence.some(x => x.id === id))) return false;
-      if (p.result && (!p.arrived || !['proceed', 'decline', 'report'].includes(p.result.decision) || typeof p.result.verified !== 'boolean' || typeof p.result.unsafe !== 'boolean' || !Number.isSafeInteger(p.result.personalDelta) || !Number.isSafeInteger(p.result.employerLoss) || p.result.employerLoss < 0 || typeof p.result.missed !== 'boolean')) return false;
+      if (!p || typeof p.arrived !== 'boolean' || typeof p.read !== 'boolean' || typeof p.samplePaid !== 'boolean' || p.samplePaid || !Array.isArray(p.evidence) || new Set(p.evidence).size !== p.evidence.length || !p.evidence.every(id => e.evidence.some(x => x.id === id))) return false;
+      if (![null, 'ringing', 'answered', 'declined'].includes(p.callStatus)) return false;
+      if ((e.channel !== 'calls' || !p.arrived) && p.callStatus !== null) return false;
+      if (e.channel === 'calls' && p.arrived && p.callStatus === null) return false;
+      if (!p.arrived && (p.evidence.length || p.read || p.result)) return false;
+      if (p.result && (!p.arrived || p.callStatus === 'ringing' || !['proceed', 'decline', 'report'].includes(p.result.decision) || typeof p.result.verified !== 'boolean' || typeof p.result.unsafe !== 'boolean' || !Number.isSafeInteger(p.result.personalDelta) || !Number.isSafeInteger(p.result.employerLoss) || p.result.employerLoss < 0 || typeof p.result.missed !== 'boolean' || !Array.isArray(p.result.inspectedEvidence) || p.result.inspectedEvidence.length !== p.evidence.length || !p.result.inspectedEvidence.every(id => p.evidence.includes(id)))) return false;
       return true;
     })) return null;
-    if (!Array.isArray(s.ledger) || !s.ledger.every(l => typeof l.id === 'string' && typeof l.title === 'string' && Number.isSafeInteger(l.cents) && Number.isInteger(l.stage) && l.stage >= 0 && l.stage <= 3)) return null;
+    if (!Array.isArray(s.ledger) || new Set(s.ledger.map(l => l.id)).size !== s.ledger.length || !s.ledger.every(l => typeof l.id === 'string' && typeof l.title === 'string' && Number.isSafeInteger(l.cents) && Number.isInteger(l.stage) && l.stage >= 0 && l.stage < STAGES.length && (l.caseId === undefined || Boolean(CASES[l.caseId])))) return null;
     if (!Array.isArray(s.calls) || !s.calls.every(c => CASES[c.caseId]?.evidence.some(e => e.id === c.evidenceId && e.call))) return null;
     if (s.phone.record === 'list') {
       if (s.phone.app !== 'messages' && s.phone.app !== 'mail') return null;
@@ -161,15 +186,14 @@ export function decodeSave(raw: string): GameState | null {
     if (s.phone.caseId && !s.progress[s.phone.caseId].arrived) return null;
     if (s.phone.app === 'feedback' && (!s.phone.caseId || !s.progress[s.phone.caseId].result)) return null;
     for (let i = 0; i < s.stage; i++) if (!s.order[i].every(id => s.progress[id].result)) return null;
-    if (s.finished && (s.stage !== 3 || s.cash < 100000000 || resolvedCount(s) !== 8)) return null;
-    const stageTaps = s.stageTaps ?? 0, lastResolutionTap = s.lastResolutionTap ?? null;
-    if (!Number.isSafeInteger(stageTaps) || stageTaps < 0 || (lastResolutionTap !== null && (!Number.isSafeInteger(lastResolutionTap) || lastResolutionTap < 0 || lastResolutionTap > stageTaps))) return null;
-    // Older saves may be looking at evidence in the retired Browser app.
-    // Keep the inspected record open in its current app without changing evidence credit.
-    const legacyBrowser = (s.phone.app as string) === 'browser';
-    const openedEvidence = s.phone.caseId && s.phone.record ? CASES[s.phone.caseId].evidence.find(e => e.id === s.phone.record) : undefined;
-    const phone: GameState['phone'] = legacyBrowser ? { ...s.phone, app: openedEvidence?.app ?? 'home' } : s.phone;
+    if (s.order.slice(s.stage + 1).flat().some(id => s.progress[id].arrived)) return null;
+    if (s.order[s.stage].filter(id => s.progress[id].arrived && !s.progress[id].result).length > 1) return null;
+    if ((s.finished || s.milestoneSeen) && (s.stage !== 3 || resolvedCount(s) !== ENCOUNTERS.length)) return null;
+    if (s.finished && (s.cash < 100000000 || s.milestoneSeen)) return null;
     const pending = activeCase(s);
-    return { ...s, stageTaps, lastResolutionTap, hidden: false, lastTap: -1000, phone: pending && !phone.open ? { open: true, app: CASES[pending].channel, caseId: pending, record: null } : phone };
+    const phone = pending && !s.phone.open
+      ? { open: true, app: encounterChannel(s, pending), caseId: pending, record: null }
+      : { ...s.phone, open: Boolean(pending) || (s.phone.open && s.phone.app === 'feedback') };
+    return { ...s, hidden: false, lastTap: -1000, phone };
   } catch { return null; }
 }

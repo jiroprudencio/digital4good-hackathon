@@ -1,338 +1,382 @@
-import { expect, test } from '@playwright/test';
-import { CASES, ENCOUNTERS } from '../src/content';
-import { createGame, SAVE_KEY } from '../src/game';
+import { expect, test, type Page } from '@playwright/test';
+import { CASES, ENCOUNTERS, STAGES, type EncounterVariant } from '../src/content';
+import { createGame, SAVE_KEY, type GameState } from '../src/game';
+import { availableContacts } from '../src/profiles';
 
-for (const viewport of [{ width: 3860, height: 2160 }, { width: 1930, height: 980 }, { width: 1280, height: 720 }]) {
-  test(`desktop fits ${viewport.width}x${viewport.height} with forty notes`, async ({ page }) => {
+const cashValue = async (page: Page) => Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''));
+const stored = async (page: Page): Promise<GameState> => page.evaluate(key => JSON.parse(localStorage.getItem(key)!), SAVE_KEY);
+const phone = (page: Page) => page.getByTestId('phone');
+
+function stageSave(stage = 0, encounter?: EncounterVariant): GameState {
+  const s = createGame(() => .999);
+  s.started = true; s.briefing = false; s.stage = stage; s.cash = 200000000; s.gross = 200000000;
+  for (const previous of ENCOUNTERS.filter(e => e.stage < stage)) {
+    s.progress[previous.id].arrived = true;
+    s.progress[previous.id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, inspectedEvidence: [], missed: !previous.scam && previous.stage !== 3 };
+  }
+  if (encounter) {
+    const p = s.progress[encounter.id];
+    p.arrived = true; p.read = true; p.callStatus = encounter.channel === 'calls' ? 'ringing' : null;
+    s.phone = { open: true, app: encounter.channel, caseId: encounter.id, record: null };
+  }
+  return s;
+}
+async function seed(page: Page, state: GameState) {
+  await page.addInitScript(({ key, value }) => {
+    if (!localStorage.getItem(key)) localStorage.setItem(key, value);
+  }, { key: SAVE_KEY, value: JSON.stringify(state) });
+}
+async function start(page: Page) {
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Jiro');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByTestId('stage-profile')).toBeVisible();
+  await page.getByTestId('stage-profile').getByRole('button', { name: 'Next', exact: true }).click();
+}
+async function investigate(page: Page, encounter: EncounterVariant) {
+  const evidence = encounter.evidence.find(e => e.id === encounter.decisive)!;
+  await phone(page).getByRole('button', { name: 'Phone home', exact: true }).last().click();
+  await phone(page).getByRole('button', { name: 'Contacts', exact: true }).click();
+  const contact = availableContacts(encounter.stage).find(c => c.id === evidence.contactId)!;
+  expect(contact, encounter.id + ' has a saved decisive contact').toBeTruthy();
+  await phone(page).getByRole('button', { name: new RegExp(contact.name) }).first().click();
+  await phone(page).getByRole('button', { name: 'Call ' + contact.name, exact: true }).click();
+  await expect.poll(async () => (await stored(page)).progress[encounter.id].evidence).toContain(encounter.decisive);
+  await expect(phone(page).getByRole('region', { name: evidence.title, exact: true })).toBeVisible();
+}
+async function resolve(page: Page, encounter: EncounterVariant, proceed: boolean) {
+  const card = page.getByTestId('decision-card');
+  await card.getByRole('button', { name: proceed ? encounter.proceed : 'Decline request', exact: !proceed }).click();
+  await card.getByRole('button', { name: proceed ? 'Confirm action' : 'Confirm decision', exact: true }).click();
+  await expect.poll(async () => Boolean((await stored(page)).progress[encounter.id].result)).toBe(true);
+}
+async function noPageOverflow(page: Page) {
+  expect(await page.evaluate(() => ({ x: document.documentElement.scrollWidth > innerWidth + 1, y: document.documentElement.scrollHeight > innerHeight + 1 }))).toEqual({ x: false, y: false });
+}
+
+test('character choices persist, stage profile gates play, and restart is explicit', async ({ page }, testInfo) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Ari 李');
+  await page.getByRole('combobox', { name: 'Gender', exact: true }).selectOption('non-binary');
+  await page.getByRole('radio', { name: 'Skin tone 6', exact: true }).check();
+  await page.screenshot({ path: testInfo.outputPath('character-creator.png') });
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  const briefing = page.getByTestId('stage-profile');
+  await expect(briefing).toContainText('Ari 李');
+  await expect(briefing).toContainText('Maya');
+  const before = (await stored(page)).cash;
+  await page.waitForTimeout(350);
+  expect((await stored(page)).cash).toBe(before);
+  await page.reload();
+  await expect(briefing).toBeVisible();
+  await briefing.getByRole('button', { name: 'Next', exact: true }).click();
+  expect((await stored(page)).character).toEqual({ name: 'Ari 李', gender: 'non-binary', skinTone: 5 });
+  await page.getByTestId('earn').click();
+  await page.getByRole('button', { name: 'Restart game', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect((await stored(page)).cash).toBe(before + 200);
+  await page.getByRole('button', { name: 'Restart game', exact: true }).click();
+  await page.getByRole('button', { name: 'Start fresh', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('fast clicks all earn, idle time does not, and mandatory event blocks further taps', async ({ page }) => {
+  await start(page);
+  const initial = await cashValue(page);
+  const first = await stored(page);
+  const firstCost = CASES[first.order[0][0]].cost;
+  const tapsUntilRequest = Math.max(5, Math.ceil((firstCost - initial) / STAGES[0].tap));
+  await expect(page.getByTestId('stacked-note')).toHaveCount(1);
+  await expect(page.getByTestId('earn')).toHaveAccessibleName('Earn 2 SGD. Tap the note.');
+  await page.getByTestId('earn').click({ clickCount: 4, delay: 5 });
+  expect(await cashValue(page)).toBe(initial + 8);
+  await page.waitForTimeout(1100);
+  expect(await cashValue(page)).toBe(initial + 8);
+  for (let tap = 4; tap < tapsUntilRequest; tap++) await page.getByTestId('earn').click();
+  await expect(page.getByTestId('event-shade')).toBeVisible();
+  await expect(page.getByTestId('earn')).toBeDisabled();
+  await expect(phone(page)).toHaveAttribute('role', 'dialog');
+  await expect(page.locator('header').first()).toHaveAttribute('inert', '');
+  const before = await cashValue(page);
+  await page.reload();
+  await expect(page.getByTestId('event-shade')).toBeVisible();
+  expect(await cashValue(page)).toBe(before);
+  await phone(page).getByRole('button', { name: 'Phone home', exact: true }).last().click();
+  await phone(page).getByRole('button', { name: 'Contacts', exact: true }).click();
+  await phone(page).getByRole('button', { name: /My Card/ }).click();
+  await expect(phone(page)).toContainText('Planning a concert');
+  await expect(page.getByTestId('earn')).toBeDisabled();
+});
+
+for (const viewport of [{ width: 3860, height: 2160 }, { width: 1920, height: 1080 }, { width: 1536, height: 864 }, { width: 1280, height: 720 }]) {
+  test('desktop fits ' + viewport.width + 'x' + viewport.height + ' with upgraded notes', async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
-    const s = createGame(() => 0);
-    s.started = true; s.stage = 2; s.upgrade = true; s.cash = 5000000;
-    for (const e of ENCOUNTERS.filter(e => e.stage < 2)) {
-      s.progress[e.id].arrived = true;
-      s.progress[e.id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: !e.scam };
-    }
-    await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: SAVE_KEY, value: JSON.stringify(s) });
-    await page.goto('/?theme=pocket&font=arcade');
-    await expect(page.getByTestId('stacked-note')).toHaveCount(40);
-    const phoneBounds = await page.getByTestId('phone').locator('[data-app]').boundingBox();
-    expect(phoneBounds).not.toBeNull();
-    expect(phoneBounds!.width / phoneBounds!.height).toBeCloseTo(78 / 163.4, 2);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    for (const control of [page.getByTestId('earn'), page.getByRole('button', { name: 'Upgrade owned' }), page.getByTestId('phone')]) {
-      await expect(control).toBeInViewport();
-    }
-    expect(await page.getByRole('list', { name: 'Life stages' }).locator('li').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain('Silkscreen');
+    const s = stageSave(2); s.upgrade = true;
+    await seed(page, s); await page.goto('/');
+    await expect(page.getByTestId('stacked-note')).toHaveCount(2);
+    await expect(page.getByTestId('earn')).toBeInViewport();
+    await expect(phone(page)).toBeInViewport();
+    await noPageOverflow(page);
+    await page.screenshot({ path: testInfo.outputPath('desktop.png') });
   });
 }
-import { FONT_PAIRINGS } from '../src/fonts';
+test('small laptop event keeps phone and floating decisions reachable', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await seed(page, stageSave(2, CASES['office-a'])); await page.goto('/');
+  await expect(page.getByTestId('decision-card')).toBeInViewport();
+  await expect(phone(page)).toBeInViewport();
+  await noPageOverflow(page);
+  const card = (await page.getByTestId('decision-card').boundingBox())!;
+  const handset = (await phone(page).locator('[data-app]').boundingBox())!;
+  expect(card.x + card.width).toBeLessThanOrEqual(handset.x);
+  await page.screenshot({ path: testInfo.outputPath('event-laptop.png') });
+});
 
-test('five taps force an encounter; investigate, reload and resolve before resuming', async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  await page.getByTestId('earn').focus();
-  await page.keyboard.press('Enter');
-  expect(Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''))).toBeGreaterThanOrEqual(70);
-  const afterTap = await page.getByTestId('balance').innerText();
-  await page.waitForTimeout(1200);
-  await expect(page.getByTestId('balance')).toHaveText(afterTap);
-  await expect(page.getByTestId('phone')).toHaveAttribute('role', 'region');
-  await expect(page.getByTestId('event-shade')).not.toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('game.png'), fullPage: true });
-  for (let i = 0; i < 4; i++) await page.getByTestId('earn').click();
-  const phone = page.getByTestId('phone');
-  await expect(phone).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'dialog');
-  await expect(phone).toHaveAttribute('aria-modal', 'true');
-  await expect(page.getByTestId('event-shade')).toBeVisible();
-  for (const area of ['header', 'section[aria-label="Earn and save"]', 'section[aria-label^="Current scene:"]']) {
-    await expect(page.locator(area).first()).toHaveAttribute('inert', '');
-  }
-  await expect(page.getByTestId('earn')).toBeDisabled();
-  await expect(page.locator('section[aria-label^="Current scene:"] button')).toBeDisabled();
-  const held = await page.getByTestId('balance').innerText();
-  await page.waitForTimeout(1200);
-  await expect(page.getByTestId('balance')).toHaveText(held);
-  await page.reload();
-  await expect(phone).toBeVisible();
-  await expect(page.getByTestId('balance')).toHaveText(held);
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Contacts', exact: true }).click();
-  await phone.getByRole('button', { name: /Call LoopMarket support/ }).click();
-  await expect(phone.getByRole('region', { name: 'LoopMarket support' })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('phone.png') });
-  await page.keyboard.press('Escape');
-  await expect(phone).toBeVisible();
-  await phone.getByRole('button', { name: 'Return to request', exact: true }).first().click();
-  await phone.getByRole('button', { name: 'Decline politely' }).click();
-  await phone.getByRole('button', { name: 'Confirm decision' }).click();
-  await phone.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(phone).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'region');
-  await expect(page.getByTestId('event-shade')).not.toBeVisible();
-  await expect(phone).not.toHaveAttribute('aria-modal', 'true');
-  await expect(page.locator('header').first()).not.toHaveAttribute('inert', '');
-  await expect(page.getByTestId('earn')).toBeEnabled();
-  expect(errors).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+test('Gmail sender disclosure reveals details without awarding independent verification', async ({ page }, testInfo) => {
+  await seed(page, stageSave(2, CASES['office-a'])); await page.goto('/');
+  const toggle = phone(page).getByRole('button', { name: 'Show sender details', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(phone(page)).toContainText('ethan@irnda.gov.sg');
+  expect((await stored(page)).progress['office-a'].evidence).not.toContain(CASES['office-a'].decisive);
+  await page.screenshot({ path: testInfo.outputPath('sender-details.png') });
 });
 
 for (const encounter of ENCOUNTERS) {
-  test(`${encounter.id}: independent evidence, explicit decision, saved outcome`, async ({ page }, testInfo) => {
-    const s = createGame(() => 0);
-    s.started = true; s.stage = encounter.stage; s.cash = 5000000;
-    s.progress[encounter.id].arrived = true;
-    s.phone = { open: true, app: 'home', caseId: encounter.id, record: null };
-    // Seed a valid chapter save, then exercise all investigation and payment controls through the UI.
-    for (const previous of ENCOUNTERS.filter(e => e.stage < encounter.stage)) {
-      s.progress[previous.id].arrived = true;
-      s.progress[previous.id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: !previous.scam };
+  test(encounter.id + ': independent investigation, decision and reload retain outcome', async ({ page }) => {
+    await seed(page, stageSave(encounter.stage, encounter)); await page.goto('/');
+    if (encounter.channel === 'calls') {
+      await phone(page).getByRole('button', { name: 'Accept call', exact: true }).click();
+      await expect.poll(async () => (await stored(page)).progress[encounter.id].callStatus).toBe('answered');
     }
-    await page.addInitScript(({ key, value }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, value); }, { key: SAVE_KEY, value: JSON.stringify(s) });
-    await page.goto('/');
-    const phone = page.getByTestId('phone');
-    await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
-    await phone.getByRole('button', { name: new RegExp(encounter.sender.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
-    if (encounter.id === 'uni-a') {
-      await phone.getByRole('button', { name: /Try the introductory task/ }).click();
-      await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-      await phone.getByRole('button', { name: 'Bank', exact: true }).click();
-      await expect(phone.getByText('Introductory task commission')).toBeVisible();
-    }
-    await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-    const evidence = encounter.evidence.find(v => v.id === encounter.decisive)!;
-    await phone.getByRole('button', { name: 'Contacts', exact: true }).click();
-    await phone.getByRole('button', { name: new RegExp(evidence.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
-    await expect(phone.getByRole('region', { name: evidence.title })).toBeVisible();
-    await phone.getByRole('button', { name: 'Return to request', exact: true }).first().click();
-    await phone.getByRole('button', { name: encounter.scam ? 'Report concern' : encounter.proceed, exact: encounter.scam }).click();
-    await phone.getByRole('button', { name: encounter.scam ? 'Confirm decision' : 'Confirm action', exact: true }).click();
-    await expect(phone.getByText('Verification demonstrated', { exact: true })).toBeVisible();
-    const held = await page.getByTestId('balance').innerText();
+    await investigate(page, encounter);
+    await resolve(page, encounter, !encounter.scam);
+    await expect(phone(page)).toContainText('Verification demonstrated');
+    const result = (await stored(page)).progress[encounter.id].result;
+    expect(result?.verified).toBe(true);
+    const balance = await cashValue(page);
     await page.reload();
-    await expect(phone.getByText('Verification demonstrated', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('balance')).toHaveText(held);
-    if (encounter.stage === 3) await page.screenshot({ path: testInfo.outputPath('home-outcome.png') });
-    const stored = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), SAVE_KEY);
-    expect(stored.progress[encounter.id].result.verified).toBe(true);
-    expect(CASES[encounter.id].stage).toBe(encounter.stage);
+    await expect(phone(page)).toContainText('Verification demonstrated');
+    expect(await cashValue(page)).toBe(balance);
+    expect((await stored(page)).progress[encounter.id].result).toEqual(result);
   });
 }
 
-test('loaded game stays playable offline and reduced motion persists', async ({ page, context }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  await page.getByText('Settings', { exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Less motion' }).check();
-  await page.reload();
-  await page.getByText('Settings', { exact: true }).click();
-  await expect(page.getByRole('checkbox', { name: 'Less motion' })).toBeChecked();
-  await page.getByText('Settings', { exact: true }).click();
-  await context.setOffline(true);
-  await page.getByTestId('earn').focus(); await page.keyboard.press('Enter');
-  await expect(page.getByTestId('phone')).toHaveAttribute('role', 'region');
-  await page.getByRole('button', { name: 'Bank', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your savings' })).toBeVisible();
-});
-
-test('persistent phone supports idle Bank browsing while taps continue', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  const phone = page.getByTestId('phone');
-  await expect(phone).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'region');
-  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
-  await expect(phone.getByRole('heading', { name: 'Your savings' })).toBeVisible();
-  await expect(page.getByTestId('event-shade')).not.toBeVisible();
-  await page.getByTestId('earn').click();
-  await expect(page.getByTestId('balance')).toHaveText('70');
-  await expect(phone.getByRole('heading', { name: 'Your savings' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await expect(phone.getByRole('button', { name: 'Messages', exact: true })).toBeVisible();
-  await expect(page.getByTestId('earn')).toBeEnabled();
-});
-
-test('outcome navigation retains spotlight until Resume tapping', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
-  const phone = page.getByTestId('phone');
-  await phone.getByRole('button', { name: 'Decline politely' }).click();
-  await phone.getByRole('button', { name: 'Confirm decision' }).click();
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
-  await expect(phone).toHaveAttribute('role', 'dialog');
-  await expect(page.getByTestId('event-shade')).toBeVisible();
+test('declining an incoming call delivers a message and does not resolve the encounter', async ({ page }, testInfo) => {
+  await seed(page, stageSave(3, CASES['home-b'])); await page.goto('/');
+  await phone(page).getByRole('button', { name: 'Decline call', exact: true }).click();
+  const saved = await stored(page);
+  expect(saved.progress['home-b'].callStatus).toBe('declined');
+  expect(saved.progress['home-b'].result).toBeNull();
+  expect(saved.phone.app).toBe('messages');
   await expect(page.getByTestId('earn')).toBeDisabled();
-  await phone.getByRole('button', { name: 'Resume tapping', exact: true }).click();
-  await expect(phone).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'region');
-  await expect(page.getByTestId('event-shade')).not.toBeVisible();
-  await expect(page.getByTestId('earn')).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('declined-call-message.png') });
 });
 
-test('notifications replace home requests and the external decision card stays within phone focus', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  const phone = page.getByTestId('phone');
-  await phone.getByRole('button', { name: 'Open notification centre from top bar', exact: true }).click();
-  await expect(phone.getByText('No notifications', { exact: true })).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'region');
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
-  const card = page.getByTestId('decision-card');
-  await expect(card).toBeVisible();
-  expect(await card.evaluate(el => el.closest('[data-app]') === null)).toBe(true);
-  const handsetBounds = (await phone.locator('[data-app]').boundingBox())!;
-  const cardBounds = (await card.boundingBox())!;
-  if (page.viewportSize()!.width > 760) expect(cardBounds.x + cardBounds.width).toBeLessThan(handsetBounds.x);
-  else expect(cardBounds.y).toBeGreaterThanOrEqual(handsetBounds.y + handsetBounds.height);
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await expect(phone.getByRole('heading', { name: 'Requests', exact: true })).toHaveCount(0);
-  await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
-  await expect(phone.getByRole('region', { name: 'Notification Centre', exact: true })).toBeVisible();
-  await page.reload();
-  await expect(phone.getByRole('region', { name: 'Notification Centre', exact: true })).toBeVisible();
-  await expect(card).toBeVisible();
-  await phone.getByRole('region', { name: 'Notification Centre', exact: true }).getByRole('button').first().click();
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Bank', exact: true }).click();
-  await expect(card.getByRole('button', { name: 'Decline politely', exact: true })).toBeVisible();
-  await card.getByRole('button', { name: 'Decline politely', exact: true }).click();
-  await card.getByRole('button', { name: 'Confirm decision', exact: true }).focus();
-  await page.keyboard.press('Tab');
-  await expect(phone.getByRole('button', { name: 'Open notification centre from top bar', exact: true })).toBeFocused();
-  await card.getByRole('button', { name: 'Confirm decision', exact: true }).click();
-  await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('event-shade')).toBeVisible();
-});
-
-test('holding the note performs one tap and no repeated income', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  await page.getByTestId('earn').click({ delay: 1600 });
-  expect(Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''))).toBe(70);
-  await page.waitForTimeout(1200);
-  expect(Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''))).toBe(70);
-});
-
-for (const theme of ['pocket', 'ledger', 'arcade', 'void', 'blueprint']) {
-  test(`${theme} theme renders at the selected viewport without horizontal overflow`, async ({ page }, testInfo) => {
-    await page.goto(`/?theme=${theme}`);
-    await page.getByRole('button', { name: 'Start game' }).click();
-    await page.getByText('Settings', { exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Theme', exact: true })).toHaveValue(theme);
-    await page.getByText('Settings', { exact: true }).click();
-    await expect(page.locator(`[data-theme="${theme}"]`)).toBeVisible();
-    await expect(page.getByTestId('earn')).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`${theme}.png`), fullPage: true });
+for (const mode of ['verified', 'mistakes'] as const) {
+  test('all twelve encounters and stage briefings finish a ' + mode + ' run', async ({ page }) => {
+    test.setTimeout(180000);
+    await page.clock.install({ time: new Date('2026-11-06T09:40:00Z') });
+    await seed(page, stageSave()); await page.goto('/');
+    await page.clock.pauseAt(new Date('2026-11-06T09:41:00Z'));
+    for (let stage = 0; stage < STAGES.length; stage++) {
+      if (stage > 0) {
+        await expect(page.getByTestId('stage-profile')).toBeVisible();
+        await page.getByTestId('stage-profile').getByRole('button', { name: 'Next', exact: true }).click();
+      }
+      for (let index = 0; index < 3; index++) {
+        for (let tap = 0; tap < 5; tap++) await page.getByTestId('earn').click();
+        if (stage > 0 || index > 0) await page.clock.runFor(10000);
+        const state = await stored(page);
+        const id = state.order[stage].find(caseId => state.progress[caseId].arrived && !state.progress[caseId].result)!;
+        const encounter = CASES[id];
+        if (encounter.channel === 'calls') await phone(page).getByRole('button', { name: 'Accept call', exact: true }).click();
+        if (mode === 'verified') await investigate(page, encounter);
+        await resolve(page, encounter, mode === 'mistakes' || !encounter.scam);
+        await phone(page).getByRole('button', { name: 'Continue', exact: true }).click();
+      }
+    }
+    await expect(page.getByRole('dialog', { name: 'Your journey results', exact: true })).toBeVisible();
+    const saved = await stored(page);
+    expect(saved.finished).toBe(true);
+    expect(Object.values(saved.progress).filter(p => p.result)).toHaveLength(12);
+    expect(Object.values(saved.progress).filter(p => p.result?.unsafe)).toHaveLength(mode === 'verified' ? 0 : 8);
+    expect(saved.cash).toBeGreaterThanOrEqual(100000000);
+    await page.getByRole('button', { name: 'Keep playing', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Your journey results', exact: true })).toHaveCount(0);
+    await page.getByTestId('earn').click();
+    expect((await stored(page)).cash).toBeGreaterThan(saved.cash);
+    await page.reload();
+    expect((await stored(page)).milestoneSeen).toBe(true);
+    await expect(page.getByTestId('earn')).toBeEnabled();
   });
 }
 
-test('theme gallery contains five isolated live previews', async ({ page }, testInfo) => {
-  await page.goto('/?view=themes');
-  await expect(page.getByRole('heading', { name: 'Scamagotchi themes' })).toBeVisible();
-  await expect(page.locator('iframe')).toHaveCount(5);
-  for (const theme of ['pocket', 'ledger', 'arcade', 'void', 'blueprint']) {
-    await expect(page.locator(`iframe[title="${theme} game preview"]`)).toHaveAttribute('src', `/?theme=${theme}&preview=1`);
-  }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('themes.png'), fullPage: true });
+for (const [stage, advertised] of ['S$200', 'S$2.0k', 'S$20.0k', 'S$100.0k'].entries()) {
+  test('stage ' + stage + ' upgrade advertises its actual price and doubles earnings once', async ({ page }) => {
+    await seed(page, stageSave(stage)); await page.goto('/');
+    const before = await stored(page);
+    await page.getByRole('button', { name: advertised, exact: true }).click();
+    const upgraded = await stored(page);
+    expect(before.cash - upgraded.cash).toBe(STAGES[stage].cost * 100);
+    await expect(page.getByRole('button', { name: 'Owned', exact: true })).toBeDisabled();
+    await page.getByTestId('earn').click();
+    expect((await stored(page)).cash - upgraded.cash).toBe(STAGES[stage].tap * 200);
+    await page.reload();
+    expect((await stored(page)).upgrade).toBe(true);
+  });
+}
+
+test('event cooldown allows earning, pauses during profile review and survives reload', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-06T09:40:00Z') });
+  await seed(page, stageSave(0, CASES['school-a'])); await page.goto('/');
+  await page.clock.pauseAt(new Date('2026-11-06T09:41:00Z'));
+  await resolve(page, CASES['school-a'], false);
+  await phone(page).getByRole('button', { name: 'Continue', exact: true }).click();
+  const before = (await stored(page)).cash;
+  for (let tap = 0; tap < 5; tap++) await page.getByTestId('earn').click();
+  expect((await stored(page)).cash).toBe(before + STAGES[0].tap * 500);
+  await expect(page.getByTestId('decision-card')).toHaveCount(0);
+  await page.clock.runFor(7000);
+  await page.getByRole('button', { name: 'Open your character profile', exact: true }).click();
+  await page.clock.runFor(30000);
+  await page.getByRole('button', { name: 'Close profile', exact: true }).click();
+  await expect(page.getByTestId('decision-card')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('earn')).toBeEnabled();
+  await page.clock.runFor(3500);
+  await expect(page.getByTestId('decision-card')).toBeVisible();
+  await expect(page.getByTestId('earn')).toBeDisabled();
 });
 
-test('resetting a theme preview cannot overwrite the saved game', async ({ page }) => {
-  const saved = { ...createGame(), started: true, cash: 9876500, gross: 9871500 };
-  const original = JSON.stringify(saved);
-  await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: SAVE_KEY, value: original });
-  await page.goto('/?theme=arcade&preview=1');
+test('Phone home releases a completed request pause and old paused saves recover', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-06T09:40:00Z') });
+  const state = stageSave(0, CASES['school-a']);
+  await seed(page, state); await page.goto('/');
+  await page.clock.pauseAt(new Date('2026-11-06T09:41:00Z'));
+  await resolve(page, CASES['school-a'], false);
+  await expect(page.getByTestId('earn')).toBeDisabled();
+  await phone(page).getByRole('button', { name: 'Phone home', exact: true }).last().click();
+  await expect(page.getByTestId('event-shade')).toHaveCount(0);
+  await expect(page.getByTestId('earn')).toBeEnabled();
+  const before = await stored(page);
   await page.getByTestId('earn').click();
-  await page.getByRole('button', { name: 'Restart game', exact: true }).click();
-  await page.getByRole('button', { name: 'Start fresh', exact: true }).click();
-  await page.getByRole('button', { name: 'Start game', exact: true }).click();
-  await page.waitForTimeout(1200);
-  expect(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY)).toBe(original);
+  expect((await stored(page)).cash).toBe(before.cash + STAGES[0].tap * 100);
+
+  // Restore the exact formerly-stuck shape without discarding the completed run.
+  await page.evaluate(key => {
+    const saved = JSON.parse(localStorage.getItem(key)!);
+    saved.phone.open = true; saved.phone.app = 'home';
+    localStorage.setItem(key, JSON.stringify(saved));
+  }, SAVE_KEY);
+  await page.reload();
+  await expect(page.getByTestId('earn')).toBeEnabled();
+  expect((await stored(page)).progress['school-a'].result).toEqual(before.progress['school-a'].result);
+  expect((await stored(page)).cash).toBe(before.cash + STAGES[0].tap * 100);
 });
 
-test('development exit preserves evidence and resumes clicks until the request is reopened', async ({ page }) => {
+test('loaded game works offline and mobile phone decisions remain accessible', async ({ page, context }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seed(page, stageSave(0, CASES['school-a'])); await page.goto('/');
+  await context.setOffline(true);
+  await investigate(page, CASES['school-a']);
+  await resolve(page, CASES['school-a'], false);
+  await expect(phone(page)).toContainText('Verification demonstrated');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('mobile-outcome.png'), fullPage: true });
+});
+
+test('capture implemented interfaces for approved-render comparison', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.addInitScript(key => {
+    const seed = sessionStorage.getItem('qa-capture-seed');
+    if (seed) { localStorage.setItem(key, seed); sessionStorage.removeItem('qa-capture-seed'); }
+  }, SAVE_KEY);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  for (let i = 0; i < 5; i++) await page.getByTestId('earn').click();
-  const phone = page.getByTestId('phone');
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Contacts', exact: true }).click();
-  await phone.getByRole('button', { name: /Call LoopMarket support/ }).click();
-  const before = Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''));
-  await phone.getByRole('button', { name: 'Exit request (dev)' }).click();
-  await expect(phone).toBeVisible();
-  await expect(phone).toHaveAttribute('role', 'region');
-  await expect(page.getByTestId('event-shade')).not.toBeVisible();
-  await page.getByTestId('earn').click();
-  expect(Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''))).toBe(before + 20);
-  await expect(phone.getByRole('region', { name: 'LoopMarket support' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Resume request', exact: true }).click();
-  await expect(phone).toHaveAttribute('role', 'dialog');
-  await expect(page.getByTestId('event-shade')).toBeVisible();
-  await phone.getByRole('button', { name: 'Decline politely' }).click();
-  await phone.getByRole('button', { name: 'Confirm decision' }).click();
-  await expect(phone.getByText('Verification demonstrated', { exact: true })).toBeVisible();
-});
-
-test('restart can be cancelled and only replaces the run after confirmation', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start game' }).click();
-  await page.getByTestId('earn').click();
-  const earned = await page.getByTestId('balance').innerText();
-  await page.getByRole('button', { name: 'Restart game', exact: true }).click();
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByTestId('balance')).toHaveText(earned);
-  await page.getByRole('button', { name: 'Restart game', exact: true }).click();
-  await page.getByRole('button', { name: 'Start fresh', exact: true }).click();
-  await page.getByRole('button', { name: 'Start game' }).click();
-  await expect(page.getByTestId('balance')).toHaveText('50');
-});
-
-test('font gallery renders all five pairings using the locally loaded fonts', async ({ page }, testInfo) => {
-  await page.goto('/?view=fonts');
-  await expect(page.getByRole('heading', { name: 'Font pairings', exact: true })).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
-  for (const pairing of FONT_PAIRINGS) {
-    const sample = page.locator(`[data-font="${pairing.id}"]`);
-    await expect(sample).toBeVisible();
-    expect(await sample.locator('h1').evaluate(el => getComputedStyle(el).fontFamily)).toContain(pairing.heading);
-    expect(await sample.locator('p').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain(pairing.body);
-    expect(await page.evaluate(family => document.fonts.check(`16px "${family}"`), pairing.body)).toBe(true);
+  async function capture(name: string) {
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForFunction(() => [...document.images].every(image => image.complete && image.naturalWidth > 0));
+    await page.screenshot({ path: 'artifacts/qa/' + name + '.png' });
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('fonts.png'), fullPage: true });
+  async function load(state: GameState) {
+    state.reducedMotion = true;
+    await page.evaluate(value => sessionStorage.setItem('qa-capture-seed', value), JSON.stringify(state));
+    await page.reload();
+    await expect.poll(async () => (await stored(page)).stage).toBe(state.stage);
+    if (state.phone.caseId) await expect(page.getByTestId('decision-card')).toBeVisible();
+  }
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Jiro');
+  await capture('01-character-creator');
+  for (let stage = 0; stage < 4; stage++) {
+    const s = stageSave(stage); s.briefing = true;
+    await load(s);
+    await expect(page.getByTestId('stage-profile')).toBeVisible();
+    await capture('02-profile-' + stage);
+  }
+  await load(stageSave(2)); await capture('03-gameplay-adult');
+  await load(stageSave(0, CASES['school-a'])); await capture('04-messages-event');
+  await load(stageSave(2, CASES['office-a'])); await capture('05-mail-collapsed');
+  await phone(page).getByRole('button', { name: 'Show sender details', exact: true }).click();
+  await capture('06-mail-expanded');
+  await phone(page).getByRole('button', { name: 'Phone home', exact: true }).last().click();
+  await phone(page).getByRole('button', { name: 'Contacts', exact: true }).click();
+  await capture('07-contacts');
+  await phone(page).getByRole('button', { name: /My Card/ }).click(); await capture('08-my-card');
+  await phone(page).getByRole('button', { name: 'Open notification centre from top bar', exact: true }).click(); await capture('09-notifications');
+  await phone(page).getByRole('button', { name: 'Phone home', exact: true }).last().click();
+  await phone(page).getByRole('button', { name: 'Bank', exact: true }).click(); await capture('10-bank');
+  await load(stageSave(3, CASES['home-a'])); await capture('11-incoming-call');
+  await phone(page).getByRole('button', { name: 'Accept call', exact: true }).click(); await capture('12-active-call');
+  await investigate(page, CASES['home-a']); await capture('13-independent-call');
+  await resolve(page, CASES['home-a'], false); await capture('14-debrief');
 });
 
-test('saved campus bulletin and archived chats remain accessible during a pending request', async ({ page }) => {
-  const s = createGame(() => 0); s.started = true; s.stage = 1;
-  for (const id of s.order[0]) {
-    s.progress[id].arrived = true;
-    s.progress[id].result = { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, missed: id === 'school-b' };
-  }
-  s.progress['uni-a'].arrived = true;
-  s.phone = { open: true, app: 'messages', caseId: 'uni-a', record: null };
-  await page.addInitScript(({ key, value }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, value); }, { key: SAVE_KEY, value: JSON.stringify(s) });
+
+test('capture detailed character atlas in creator, profiles and My Card', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1536, height: 864 });
+  await page.addInitScript(key => {
+    const seed = sessionStorage.getItem('qa-avatar-seed');
+    if (seed) { localStorage.setItem(key, seed); sessionStorage.removeItem('qa-avatar-seed'); }
+  }, SAVE_KEY);
   await page.goto('/');
-  const phone = page.getByTestId('phone');
-  await phone.getByRole('button', { name: 'Back to chats', exact: true }).click();
-  await phone.getByRole('button', { name: /Jamie · LoopMarket/ }).click();
-  await expect(phone.getByRole('button', { name: 'Read outcome' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Open notification centre', exact: true }).click();
-  await phone.getByRole('button', { name: /Rae · flexible work/ }).click();
-  await phone.getByRole('button', { name: 'Phone home', exact: true }).click();
-  await phone.getByRole('button', { name: 'Mail', exact: true }).click();
-  await phone.getByRole('button', { name: /Bayview student-work bulletin/ }).click();
-  await expect(phone.getByRole('region', { name: 'Bayview student-work bulletin' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Return to request', exact: true }).click();
-  await expect(phone.getByRole('button', { name: 'Fund the next batch', exact: false })).toBeVisible();
-  const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), SAVE_KEY);
-  expect(saved.progress['uni-a'].evidence).toContain('portal');
-  expect(saved.progress['uni-a'].result).toBeNull();
+  async function capture(name: string) {
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      const sources = [...document.querySelectorAll('svg image')].map(node => node.getAttribute('href')).filter(Boolean) as string[];
+      await Promise.all([...new Set(sources)].map(src => new Promise<void>((resolve, reject) => {
+        const image = new Image(); image.onload = () => resolve(); image.onerror = () => reject(new Error('Missing avatar atlas: ' + src)); image.src = src;
+      })));
+    });
+    await noPageOverflow(page);
+    await page.screenshot({ path: 'artifacts/qa/avatars/' + name + '.png' });
+  }
+  async function load(state: GameState) {
+    state.reducedMotion = true;
+    await page.evaluate(value => sessionStorage.setItem('qa-avatar-seed', value), JSON.stringify(state));
+    await page.reload();
+    await expect.poll(async () => (await stored(page)).stage).toBe(state.stage);
+  }
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Jiro');
+  await capture('01-creator-default');
+  await page.getByRole('combobox', { name: 'Gender', exact: true }).selectOption('woman');
+  await page.getByRole('radio', { name: 'Skin tone 1', exact: true }).check();
+  await capture('02-creator-woman-light');
+  await page.getByRole('radio', { name: 'Skin tone 6', exact: true }).check();
+  await capture('03-creator-woman-dark');
+  for (let stage = 0; stage < 4; stage++) {
+    const state = stageSave(stage); state.briefing = true;
+    await load(state);
+    await expect(page.getByTestId('stage-profile')).toBeVisible();
+    await capture('04-profile-' + stage);
+  }
+  const state = stageSave(3); state.character.gender = 'woman'; state.character.skinTone = 5;
+  await load(state);
+  await phone(page).getByRole('button', { name: 'Contacts', exact: true }).click();
+  await phone(page).getByRole('button', { name: /My Card/ }).click();
+  await capture('05-my-card-senior-woman');
 });

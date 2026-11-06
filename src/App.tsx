@@ -1,178 +1,130 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronDown, Download, Info, RotateCcw, ShieldCheck, X } from 'lucide-react';
-import { CASES, ENCOUNTERS, money, shortMoney, STAGES } from './content';
-import { activeCase, canAdvance, createGame, decodeSave, rates, reducer, resolvedCount, SAVE_KEY, stageResolved } from './game';
+import type { ReactNode, FormEvent } from 'react';
+import { ArrowRight, Check, ChevronDown, Download, Info, RotateCcw, Settings, X } from 'lucide-react';
+import { CASES, ENCOUNTERS, money, shortMoney, STAGES, personalise } from './content';
+import { activeCase, createGame, decodeSave, rates, reducer, resolvedCount, SAVE_KEY, stageResolved } from './game';
 import type { GameState } from './game';
-import Scene, { EarnNotes, Mascot } from './Scene';
+import Scene, { EarnNotes, Mascot, SCENE_ART } from './Scene';
+import Character from './Character';
+import { DEFAULT_CHARACTER, GENDERS, SKIN_TONES, STAGE_PROFILES } from './profiles';
+import type { Character as Player } from './profiles';
 import Phone, { useDialogFocus } from './Phone';
 import styles from './App.module.css';
-import { initialTheme, THEMES } from './themes';
-import type { Theme } from './themes';
-import { FONT_PAIRINGS, initialFont } from './fonts';
-import type { FontPairing } from './fonts';
-const preview = new URLSearchParams(location.search).has('preview');
-
+import { THEMES } from './themes';
+import { FONT_PAIRINGS } from './fonts';
+const params = new URLSearchParams(location.search);
+const preview = params.has('preview');
+const theme = THEMES.find(t => t.id === params.get('theme'))?.id ?? 'pocket';
+const font = FONT_PAIRINGS.find(f => f.id === params.get('font'))?.id ?? 'arcade';
+const elapsed=(ms:number)=>Math.floor(ms/60000)+':'+Math.floor(ms/1000%60).toString().padStart(2,'0');
 function load() {
-  if (preview) return { state: { ...createGame(() => 0), started: true }, problem: '', raw: '' };
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { state: createGame(), problem: '', raw: '' };
-    const state = decodeSave(raw);
-    return state ? { state, problem: '', raw } : { state: createGame(), problem: 'Your saved game could not be read. Keep a copy before starting fresh.', raw };
-  } catch { return { state: createGame(), problem: 'Browser storage is unavailable. You can play, but this session may not be saved.', raw: '' }; }
+ if(preview)return {state:{...createGame(()=>.7),started:true,briefing:false},problem:'',raw:''};
+ try {const raw=localStorage.getItem(SAVE_KEY);if(!raw)return {state:createGame(),problem:'',raw:''};
+ const state=decodeSave(raw);return state?{state,problem:'',raw:''}:{state:createGame(),problem:'Your save could not be read. Download a copy before starting fresh.',raw};
+ } catch {return {state:createGame(),problem:'Progress cannot be saved in this browser session.',raw:''};}
 }
-const elapsed = (ms: number) => `${Math.floor(ms / 60000)}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}`;
-
 export default function App() {
-  const [initial] = useState(load);
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-  const [font, setFont] = useState<FontPairing>(initialFont);
-  function chooseFont(value: FontPairing) {
-    setFont(value);
-    const url = new URL(location.href); url.searchParams.set('font', value); history.replaceState(null, '', url);
-    if (!preview) try { localStorage.setItem('scamagotchi.font.v2', value); } catch { /* Optional preference. */ }
-  }
-  function chooseTheme(value: Theme) {
-    setTheme(value);
-    const url = new URL(location.href); url.searchParams.set('theme', value); history.replaceState(null, '', url);
-    if (!preview) try { localStorage.setItem('scamagotchi.theme.v2', value); } catch { /* Optional preference. */ }
-  }
-  const [state, dispatch] = useReducer(reducer, initial.state);
-  const [storageProblem, setStorageProblem] = useState(initial.problem);
-  const [recovering, setRecovering] = useState(Boolean(initial.raw && initial.problem));
-  const [modal, setModal] = useState<'about' | 'reset' | null>(null);
-  const [floats, setFloats] = useState<{ id: number; value: string; x: number }[]>([]);
-  const stateRef = useRef(state); stateRef.current = state;
-  const floatId = useRef(0);
-  const floatTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const stage = STAGES[state.stage], rate = rates(state);
-  const ready = canAdvance(state), pending = activeCase(state);
-  const allResults = ENCOUNTERS.filter(e => state.progress[e.id].result);
-  const verified = allResults.filter(e => state.progress[e.id].result?.verified).length;
-  const reduced = state.reducedMotion;
-  const spotlight = state.phone.open && state.started && !state.finished && !modal && !recovering;
-  const blocked = state.phone.open || !!modal || !state.started || state.finished || recovering;
-
-  useEffect(() => {
-    let previous = performance.now();
-    const timer = setInterval(() => {
-      const now = performance.now();
-      if (!document.hidden && !modal && !recovering) dispatch({ type: 'TICK', ms: now - previous });
-      previous = now;
-    }, 250);
-    const visibility = () => { previous = performance.now(); dispatch({ type: 'HIDDEN', hidden: document.hidden }); };
-    document.addEventListener('visibilitychange', visibility);
-
-    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', visibility); };
-  }, [modal, recovering]);
-  useEffect(() => () => floatTimers.current.forEach(clearTimeout), []);
-
-  function save(s: GameState) {
-    if (recovering || preview) return;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }
-    catch { setStorageProblem('Your browser could not save this game. Keep this tab open, or download a backup.'); }
-  }
-  useEffect(() => {
-    if (recovering || preview) return;
-    const timer = setInterval(() => save(stateRef.current), 1000);
-    const flush = () => save(stateRef.current);
-    window.addEventListener('pagehide', flush);
-    return () => { clearInterval(timer); window.removeEventListener('pagehide', flush); };
-  // save reads the latest state through stateRef.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recovering]);
-  useEffect(() => { save(state); }, [state.progress, state.ledger, state.stage, state.phone, state.started, state.finished, state.reducedMotion, recovering]);
-
-  function earn() {
-    const s = stateRef.current, now = performance.now();
-    if (!s.started || s.phone.open || s.finished || s.hidden || modal || recovering) return;
-    dispatch({ type: 'TAP', now });
-    const id = ++floatId.current;
-    setFloats(old => [...old.slice(-5), { id, value: `+${money(rates(s).tap)}`, x: 35 + Math.random() * 30 }]);
-    const timer = setTimeout(() => { setFloats(old => old.filter(f => f.id !== id)); floatTimers.current = floatTimers.current.filter(t => t !== timer); }, 900);
-    floatTimers.current.push(timer);
-  }
-  function downloadSave() {
-    const blob = new Blob([recovering ? initial.raw : JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = 'scamagotchi-save.json'; a.click(); URL.revokeObjectURL(url);
-  }
-  function reset() {
-    const next = createGame(); next.reducedMotion = state.reducedMotion;
-    setRecovering(false); setStorageProblem(''); dispatch({ type: 'RESET', state: next }); setModal(null);
-    if (!preview) try { localStorage.setItem(SAVE_KEY, JSON.stringify(next)); } catch { setStorageProblem('Storage is unavailable. This new run will only last while the tab stays open.'); }
-  }
-  const progress = Math.min(100, state.cash / 100000000 * 100);
-  const stageProgress = Math.min(100, (state.stage === 3 ? state.cash : state.gross) / (stage.gate * 100) * 100);
-
-  return <div data-theme={theme} data-font={font} className={`${styles.app} ${reduced ? styles.reduced : ''}`}>
-    <header className={styles.header} inert={spotlight}>
-      <h1>Scamagotchi</h1>
-      <nav className={styles.tools} aria-label="Game settings">
-        <button aria-label="Restart game" title="Restart game" onClick={() => setModal('reset')}><RotateCcw size={20} /> Restart</button>
-        <details className={styles.settings}><summary>Settings <ChevronDown size={16} /></summary><div className={styles.settingsPanel}>
-        <label>Theme <select aria-label="Theme" value={theme} onChange={e => chooseTheme(e.target.value as Theme)}>{THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-        <a href="?view=themes" target={preview ? '_top' : undefined}>Compare themes</a>
-        <label>Fonts <select aria-label="Font pairing" value={font} onChange={e => chooseFont(e.target.value as FontPairing)}>{FONT_PAIRINGS.map(f => <option key={f.id} value={f.id}>{f.heading} + {f.body}</option>)}</select></label>
-        <a href="?view=fonts" target={preview ? '_top' : undefined}>Compare fonts</a>
-        <button aria-label="How to play" title="How to play" onClick={() => setModal('about')}><Info size={20} /></button>
-        <label className={styles.motion}><input type="checkbox" checked={reduced} onChange={e => dispatch({ type: 'MOTION', reduced: e.target.checked })} /> Less motion</label>
-        </div></details>
-      </nav>
-    </header>
-    {storageProblem && <div inert={spotlight} className={styles.storage} role="status"><p>{storageProblem}</p><button onClick={downloadSave}>Download backup</button>{recovering && <button onClick={() => setModal('reset')}>Start fresh</button>}</div>}
-    <main className={styles.main}>
-      <ol inert={spotlight} className={styles.chapters} aria-label="Life stages">{STAGES.map((s, i) => <li key={s.name} className={i === state.stage ? styles.currentChapter : ''} aria-current={i === state.stage ? 'step' : undefined}>{i < state.stage && <Check size={16} />} {s.name}</li>)}</ol>
-      <div className={styles.gameGrid}>
-        <section inert={spotlight} className={styles.moneyPanel} aria-label="Earn and save">
-          <span>Balance</span><h2 className={styles.money}>SGD <span data-testid="balance">{money(state.cash)}</span></h2>
-          <div className={styles.noteArea}>
-            <button className={styles.note} disabled={blocked} aria-label={`Earn ${money(rate.tap)} SGD. Tap the note.`} data-testid="earn" onClick={earn}><EarnNotes cents={rate.tap} stage={state.stage} /></button>
-            {floats.map(f => <span className={styles.floating} key={f.id} style={{ left: `${f.x}%` }}>{f.value}</span>)}
-          </div>
-          <p className={styles.tapHint}>{state.phone.open ? 'Paused' : `+SGD ${money(rate.tap)} per tap`}</p>
-          <label className={styles.goal}>SGD 1,000,000<progress max={100} value={progress} aria-label="Savings toward one million" /></label>
-        </section>
-        <section inert={spotlight} className={styles.scenePanel} aria-label={`Current scene: ${stage.name}`}>
-          <div className={styles.sceneArt}><Scene stage={state.stage} reducedMotion={reduced} /></div>
-          <div className={styles.stageControls}>
-            <div className={styles.upgradeRow}><span><strong>{stage.upgrade}</strong><small>{state.upgrade ? 'Double tap earnings active' : `Double taps to SGD ${money(rate.tap * 2)}`}</small></span>
-              <button className={styles.primary} disabled={blocked || state.upgrade || state.cash < stage.cost * 100} onClick={() => dispatch({ type: 'UPGRADE' })}>{state.upgrade ? 'Upgrade owned' : `Upgrade: SGD ${shortMoney(stage.cost)}`}</button>
-            </div>
-            <label className={styles.stageRequirement}><span>{state.stage < 3 ? `Next: ${STAGES[state.stage + 1].name}` : 'Finish'} <strong>{shortMoney((state.stage === 3 ? state.cash : state.gross) / 100)} / {shortMoney(stage.gate)}</strong></span><progress max={100} value={stageProgress} aria-label="Chapter money requirement" /></label>
-            <small>{stageResolved(state)} / 2 encounters</small>
-          </div>
-        </section>
-        <aside id="phone" className={`${styles.phonePanel} ${spotlight ? styles.phoneSpotlight : ''}`} inert={!state.started || state.finished || recovering || !!modal} aria-label="Phone panel">
-          <Phone state={state} dispatch={dispatch} spotlight={spotlight} />
-        </aside>
-      </div>
-      <footer inert={spotlight} className={styles.pageFooter}><span>{resolvedCount(state)} / 8 encounters</span><span>{verified} verified decisions</span><span>{elapsed(state.activeMs)} active</span></footer>
-    </main>
-    {spotlight && <div className={styles.eventShade} data-testid="event-shade" aria-hidden="true" />}
-    <div className={styles.announcement} role="status" aria-live="polite">{pending ? `New request from ${CASES[pending].sender}.` : ready ? 'Next chapter ready.' : ''}</div>
-    {!state.started && !recovering && <Onboarding onStart={() => dispatch({ type: 'START' })} />}
-    {state.finished && !modal && <Results state={state} onReset={() => setModal('reset')} onDownload={downloadSave} />}
-    {modal && <Modal title={modal === 'reset' ? 'Start a new run?' : 'How to play'} onClose={() => setModal(null)}>{modal === 'reset' ? <><p>This replaces your saved run on this browser. You can download a copy first.</p><button className={styles.secondary} onClick={downloadSave}><Download size={16} /> Download save</button><div className={styles.modalActions}><button className={styles.secondary} onClick={() => setModal(null)}>Cancel</button><button className={styles.primary} onClick={reset}>Start fresh <RotateCcw size={16} /></button></div></> : <><p>Earn by tapping. Use the phone to investigate requests before committing.</p><ul><li>Tap the note or press Enter/Space while it is focused. Waiting earns nothing.</li><li>Requests interrupt tapping. Use the phone apps to investigate, make a decision, then read the outcome.</li><li>Complete each chapter’s situations and earning milestone, to move automatically to the next chapter.</li><li>Your decisions have fictional consequences. You can always keep going.</li></ul><p>This is a practice prototype, not proof that anyone is scam-proof. Amounts and earnings are game abstractions. Official Singapore sources, reviewed 4 November 2026, are linked in each debrief.</p><button className={styles.primary} onClick={() => setModal(null)}>Got it <Check size={16} /></button></>}</Modal>}
-  </div>;
+ const [initial]=useState(load);
+ const [state,dispatch]=useReducer(reducer,initial.state);
+ const [problem,setProblem]=useState(initial.problem);
+ const [recovering,setRecovering]=useState(Boolean(initial.raw&&initial.problem));
+ const [modal,setModal]=useState<'reset'|'about'|'profile'|null>(null);
+ const [settings,setSettings]=useState(false);
+ const [floats,setFloats]=useState<{id:number;value:string}[]>([]);
+ const floatId=useRef(0), timeouts=useRef<ReturnType<typeof setTimeout>[]>([]);
+ const stage=STAGES[state.stage], rate=rates(state), pending=activeCase(state);
+ const welcome=!state.started||state.briefing;
+ const spotlight=state.phone.open&&!welcome&&!state.finished&&!modal&&!recovering;
+ const blocked=state.phone.open||welcome||state.finished||!!modal||recovering;
+ const verified=Object.values(state.progress).filter(p=>p.result?.verified).length;
+ useEffect(()=>{
+  if(preview||recovering)return;
+  try {localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch{setProblem('Progress cannot be saved. Keep this tab open or download your run.');}
+ },[state,recovering]);
+ useEffect(()=>{
+  let last=performance.now();const timer=setInterval(()=>{const now=performance.now();if(!document.hidden&&!modal&&!recovering)dispatch({type:'TICK',ms:now-last});last=now;},250);
+  const hidden=()=>{last=performance.now();dispatch({type:'HIDDEN',hidden:document.hidden});};
+  document.addEventListener('visibilitychange',hidden);
+  return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',hidden);};
+ },[modal,recovering]);
+ useEffect(()=>()=>timeouts.current.forEach(clearTimeout),[]);
+ function earn(){if(blocked)return;dispatch({type:'TAP',now:performance.now()});const id=++floatId.current;setFloats(old=>[...old.slice(-5),{id,value:'+S$'+money(rate.tap)}]);const timer=setTimeout(()=>{setFloats(old=>old.filter(f=>f.id!==id));timeouts.current=timeouts.current.filter(t=>t!==timer);},700);timeouts.current.push(timer);}
+ function download(){const blob=new Blob([recovering?initial.raw:JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='scamagotchi-save.json';a.click();URL.revokeObjectURL(url);}
+ function reset(){const next=createGame();next.reducedMotion=state.reducedMotion;setRecovering(false);setProblem('');dispatch({type:'RESET',state:next});setModal(null);setSettings(false);}
+ const stagePercent=Math.min(100,(state.stage===3?state.cash:state.gross)/(stage.gate*100)*100);
+ return <div data-theme={theme} data-font={font} className={styles.app+' '+(state.reducedMotion?styles.reduced:'')}>
+ <header className={styles.header} inert={spotlight||welcome||!!modal||state.finished}>
+ <div className={styles.brand}><Mascot mood="smug"/><h1>Scamagotchi</h1></div>
+ <ol className={styles.chapters} aria-label="Life stages">{['School','Tertiary','Adult','Senior'].map((name,i)=><li key={name} className={i===state.stage?styles.currentChapter:''} aria-current={i===state.stage?'step':undefined}>{i<state.stage&&<Check size={15}/>} {name}</li>)}</ol>
+ <div className={styles.headerTools}>
+ <button className={styles.profileButton} aria-label="Open your character profile" onClick={()=>setModal('profile')}><Character character={state.character} stage={state.stage} portrait/><span>{state.character.name}</span><ChevronDown size={16}/></button>
+ <button className={styles.iconButton} aria-label="Restart game" title="Restart game" onClick={()=>setModal('reset')}><RotateCcw size={20}/></button>
+ <div className={styles.settings}><button className={styles.iconButton} aria-label="Settings" aria-expanded={settings} onClick={()=>setSettings(!settings)}><Settings size={20}/></button>
+ {settings&&<div className={styles.settingsPanel}><label><input type="checkbox" checked={state.reducedMotion} onChange={e=>dispatch({type:'MOTION',reduced:e.target.checked})}/> Less motion</label><button onClick={()=>{setSettings(false);setModal('about');}}><Info size={18}/> How to play</button><button onClick={download}><Download size={18}/> Download save</button></div>}</div>
+ </div></header>
+ {problem&&<div className={styles.storage} role="status"><span>{problem}</span><button onClick={download}>Download backup</button>{recovering&&<button onClick={()=>setModal('reset')}>Start fresh</button>}</div>}
+ <main className={styles.main} inert={welcome||!!modal||state.finished||recovering}>
+ <div className={styles.gameGrid}>
+ <section className={styles.moneyPanel} inert={spotlight} aria-label="Earn and save">
+ <div className={styles.balanceLabel}>Balance</div><h2 className={styles.money}>S$<span data-testid="balance">{money(state.cash)}</span></h2>
+ <div className={styles.noteArea}><button data-testid="earn" className={styles.note} disabled={blocked} aria-label={'Earn '+money(rate.tap)+' SGD. Tap the note.'} onClick={earn}><EarnNotes cents={rate.tap} stage={state.stage}/></button>{floats.map(f=><span key={f.id} className={styles.floating}>{f.value}</span>)}</div>
+ <p className={styles.tapHint}>{state.phone.open?'Paused during request':'+S$'+money(rate.tap)+' / tap'}</p>
+ <div className={styles.goal}><span>{state.milestoneSeen?'One million reached':'Toward S$1,000,000'}</span><progress max={100} value={Math.min(100,state.cash/1000000)} aria-label="Savings toward one million"/>{state.milestoneSeen&&<small>Keep going. Your savings have no game cap.</small>}</div>
+ </section>
+ <section className={styles.scenePanel} inert={spotlight} aria-label={'Current scene: '+stage.name}>
+ <div className={styles.sceneArt}><Scene stage={state.stage} character={state.character} reducedMotion={state.reducedMotion}/><div className={styles.sceneTag}>{state.character.name} · {STAGE_PROFILES[state.stage].age}</div></div>
+ <div className={styles.stageControls}><div className={styles.upgradeRow}><span><strong>{stage.upgrade}</strong><small>{state.upgrade?'Double tap earnings active':'Double your tap earnings'}</small></span><button className={styles.primary} disabled={blocked||state.upgrade||state.cash<stage.cost*100} onClick={()=>dispatch({type:'UPGRADE'})}>{state.upgrade?<><Check size={16}/> Owned</>:'S$'+shortMoney(stage.cost*100)}</button></div>
+ <div className={styles.stageRequirement}><span>{state.stage<3?'Next: '+['School','Tertiary','Adult','Senior'][state.stage+1]:state.milestoneSeen?'Milestone reached':'Million milestone'}<strong>{stageResolved(state)} / {state.order[state.stage].length} encounters</strong></span><progress max={100} value={stagePercent} aria-label="Chapter money requirement"/></div></div>
+ </section>
+ <aside className={styles.phonePanel+' '+(spotlight?styles.phoneSpotlight:'')} aria-label="Phone panel"><Phone state={state} dispatch={dispatch} spotlight={spotlight}/></aside>
+ </div>
+ <footer className={styles.pageFooter} inert={spotlight}><span>{resolvedCount(state)} / {ENCOUNTERS.length} encounters</span><span>{verified} independent checks followed</span><span>{elapsed(state.activeMs)} active</span><span>Fictional scenarios · Simulated SGD</span></footer>
+ </main>
+ {spotlight&&<div className={styles.eventShade} data-testid="event-shade" aria-hidden="true"/>}
+ <div className={styles.announcement} role="status" aria-live="polite">{pending?'New request from '+CASES[pending].sender:''}</div>
+ {!state.started&&!recovering&&<Creator reduced={state.reducedMotion} onNext={character=>dispatch({type:'START',character})}/>}
+ {state.started&&state.briefing&&!recovering&&<StageProfile character={state.character} stage={state.stage} reduced={state.reducedMotion} onNext={()=>dispatch({type:'BEGIN_STAGE'})}/>}
+ {state.finished&&!modal&&<Results state={state} onReset={()=>setModal('reset')} onDownload={download} onContinue={()=>dispatch({type:'CONTINUE_PLAY'})}/>}
+ {modal==='profile'&&<StageProfile character={state.character} stage={state.stage} reduced={state.reducedMotion} onNext={()=>setModal(null)} reviewing/>}
+ {(modal==='reset'||modal==='about')&&<Modal title={modal==='reset'?'Start a new run?':'How to play'} onClose={()=>setModal(null)}>{modal==='reset'?<><p>This resets your character, savings and encounters on this browser.</p><button className={styles.secondary} onClick={download}><Download size={16}/> Download current run</button><div className={styles.modalActions}><button className={styles.secondary} onClick={()=>setModal(null)}>Cancel</button><button className={styles.primary} onClick={reset}>Start fresh</button></div></>:<><p>Tap your notes to earn. When your phone interrupts, investigate the request through its apps, decide, then read what happened.</p><p>Your avatar and Contacts → My Card hold your current profile. Expand email details, read previous records or call a saved contact.</p><p>Each stage advances after its encounters and earning milestone. One million unlocks your results; you can keep playing afterwards.</p><p>All people, calls and transactions are simulated. Scamagotchi hides behind the fraudulent requests. Genuine requests appear too.</p><button className={styles.primary} onClick={()=>setModal(null)}>Got it</button></>}</Modal>}
+ </div>;
 }
-
-function Onboarding({ onStart }: { onStart: () => void }) {
-  return <Modal title="Scamagotchi" onClose={onStart} onboarding><h2>Road to a million</h2><p>Tap the note to earn. When a request appears, investigate and decide. Reach SGD 1,000,000 across four life stages.</p><p>All money and interactions are simulated. Your progress saves on this browser.</p><button className={styles.primary} onClick={onStart}>Start game <ArrowRight size={18} /></button></Modal>;
+function Creator({onNext,reduced}:{onNext:(c:Player)=>void;reduced:boolean}) {
+ const [character,setCharacter]=useState<Player>({...DEFAULT_CHARACTER,name:''});const [error,setError]=useState('');
+ const ref=useRef<HTMLDivElement>(null);useDialogFocus(ref,()=>{});
+ function submit(e:FormEvent){e.preventDefault();if(!character.name.trim()){setError('Enter a name or nickname to continue.');return;}onNext({...character,name:character.name.trim()});}
+ return <div className={styles.introOverlay} ref={ref} role="dialog" aria-modal="true" aria-label="Create your character">
+ <div className={styles.introBackdrop}><Scene stage={0} reducedMotion={reduced} backgroundOnly/></div><div className={styles.introBrand}>Scamagotchi</div>
+ <form className={styles.creator} onSubmit={submit}><h1>Your character</h1><div className={styles.creatorGrid}><div className={styles.avatarPreview}><Character character={{...character,name:character.name||'Your'}}/><div className={styles.grass}/></div>
+ <div className={styles.creatorFields}><label>Name<input aria-label="Name" autoComplete="off" maxLength={24} value={character.name} placeholder="Your name" autoFocus aria-invalid={!!error} aria-describedby={error?'name-error':undefined} onChange={e=>{setError('');setCharacter({...character,name:e.target.value});}}/></label>
+ {error&&<p id="name-error" role="alert">{error}</p>}
+ <label>Gender<select aria-label="Gender" value={character.gender} onChange={e=>setCharacter({...character,gender:e.target.value as Player['gender']})}>{GENDERS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></label>
+ <fieldset className={styles.skin}><legend>Skin tone</legend><div>{SKIN_TONES.map((colour,i)=><label key={colour} style={{background:colour}} className={character.skinTone===i?styles.selectedSkin:''}><input type="radio" name="skin" aria-label={'Skin tone '+(i+1)} checked={character.skinTone===i} onChange={()=>setCharacter({...character,skinTone:i})}/>{character.skinTone===i&&<Check aria-hidden="true"/>}</label>)}</div></fieldset>
+ <p className={styles.muted}>Your choices stay with you through every stage.</p></div></div>
+ <footer className={styles.creatorFooter}><small>A nickname is fine. All scenarios are fictional.</small><button className={styles.primary} type="submit">Next <ArrowRight size={20}/></button></footer>
+ </form></div>;
 }
-function Modal({ title, onClose, children, onboarding = false }: { title: string; onClose: () => void; children: React.ReactNode; onboarding?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null); useDialogFocus(ref, onClose);
-  return <div className={styles.modalOverlay}><div className={`${styles.modal} ${onboarding ? styles.welcome : ''}`} ref={ref} role="dialog" aria-modal="true" aria-label={title}>{!onboarding && <div className={styles.modalHeading}><h2>{title}</h2><button aria-label="Close dialog" onClick={onClose}><X size={20} /></button></div>}{children}</div></div>;
+function StageProfile({character,stage,reduced,onNext,reviewing=false}:{character:Player;stage:number;reduced:boolean;onNext:()=>void;reviewing?:boolean}) {
+ const profile=STAGE_PROFILES[stage],ref=useRef<HTMLDivElement>(null);useDialogFocus(ref,()=>{if(reviewing)onNext();});
+ return <div className={styles.introOverlay} ref={ref} role="dialog" aria-modal="true" aria-label={reviewing?'Your character profile':'Your next life stage'}>
+ <div className={styles.introBackdrop}><Scene stage={stage} reducedMotion={reduced} backgroundOnly/></div>
+ <section className={styles.profileCard} data-testid="stage-profile"><div className={styles.profileBanner} style={{backgroundImage:'url('+SCENE_ART[stage]+')'}}><h1>{['School','Tertiary','Adult','Senior'][stage]}</h1>{reviewing&&<button className={styles.profileClose} aria-label="Close profile" onClick={onNext}><X/></button>}</div>
+ <div className={styles.profileBody}><div className={styles.profileIdentity}><Character character={character} stage={stage} portrait/><div><h2>{character.name} · {profile.age}</h2><p>{profile.role}{profile.organisation?' · '+profile.organisation:''}</p></div></div>
+ <section><h3>Right now</h3>{profile.goals.map(goal=><p key={goal}>{goal}</p>)}</section><section><h3>People</h3>{profile.contacts.slice(0,2).map(c=><p key={c.id}><strong>{c.name}</strong><br/>{c.relationship}</p>)}</section></div>
+ <footer><small>Fictional role and relationships</small><button className={styles.primary} onClick={onNext}>{reviewing?'Back to game':'Next'} <ArrowRight size={20}/></button></footer>
+ </section></div>;
 }
-function Results({ state: s, onReset, onDownload }: { state: GameState; onReset: () => void; onDownload: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useDialogFocus(ref, () => {});
-  const results = ENCOUNTERS.map(e => ({ e, p: s.progress[e.id], r: s.progress[e.id].result! }));
-  const verified = results.filter(x => x.r.verified).length;
-  const personalLoss = results.filter(x => x.r.unsafe).reduce((sum, x) => sum + Math.max(0, -x.r.personalDelta), 0);
-  const practice = results.find(x => !x.r.verified)?.e.habit ?? 'Keep using independently obtained contacts, even when a request looks familiar.';
-  return <div className={styles.resultOverlay} ref={ref} role="dialog" aria-modal="true" aria-label="Your journey results"><section className={styles.results} aria-label="Your journey results"><span className={styles.resultMark}><Mascot mood="caught" /></span><h1 tabIndex={-1} data-dialog-focus>Results</h1><div className={styles.resultStats}><span><small>Savings</small><strong>SGD {money(s.cash)}</strong></span><span><small>Verified decisions</small><strong>{verified} / 8</strong></span><span><small>Active time</small><strong>{elapsed(s.activeMs)}</strong></span></div><div className={styles.resultLesson}><ShieldCheck size={24} /><div><strong>Practice next</strong><p>{practice}</p></div></div><div className={styles.resultSummary}><span>Personal scam losses: <b>SGD {money(personalLoss)}</b></span><span>Employer loss: <b>{results.reduce((sum, x) => sum + x.r.employerLoss, 0).toLocaleString()} company units</b></span><span>Legitimate opportunities declined/reported: <b>{results.filter(x => x.r.missed).length}</b></span></div><div className={styles.resultList}>{results.map(({ e, p, r }) => <details key={e.id}><summary><span>{STAGES[e.stage].chapter}</span><div><strong>{e.title}</strong><small>{r.verified ? 'Independent verification demonstrated' : r.unsafe ? 'An unsafe commitment · a chance to practise' : 'Outcome recorded · verification still to practise'}</small></div><ChevronDown size={18} /></summary><div><p><b>{e.scam ? 'Fraudulent request.' : 'Genuine request.'}</b> {r.decision === 'proceed' ? e.success : e.declined}</p><p>{e.lesson}</p><small>You opened: {p.evidence.map(id => e.evidence.find(v => v.id === id)?.title).join(', ') || 'no evidence records'}.</small>{e.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a>)}</div></details>)}</div><p className={styles.resultDisclaimer}>Your result records this playthrough, not your real-world scam-detection ability. Active time excludes phone reading. A genuine family request can be politely declined. Your savings and opportunities were fictional.</p><div className={styles.resultButtons}><button className={styles.primary} onClick={onReset}>New game <RotateCcw size={16} /></button><button className={styles.secondary} onClick={onDownload}>Download my run <Download size={16} /></button></div></section></div>;
+function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:ReactNode}) {
+ const ref=useRef<HTMLDivElement>(null);useDialogFocus(ref,onClose);
+ return <div className={styles.modalOverlay}><div className={styles.modal} ref={ref} role="dialog" aria-modal="true" aria-label={title}><div className={styles.modalHeading}><h2>{title}</h2><button className={styles.iconButton} aria-label="Close dialog" onClick={onClose}><X/></button></div>{children}</div></div>;
 }
-
+function Results({state:s,onReset,onDownload,onContinue}:{state:GameState;onReset:()=>void;onDownload:()=>void;onContinue:()=>void}) {
+ const ref=useRef<HTMLDivElement>(null);useDialogFocus(ref,()=>{});
+ const results=ENCOUNTERS.flatMap(e=>s.progress[e.id].result?[{e,r:s.progress[e.id].result!}]:[]);
+ const lost=results.filter(x=>x.r.unsafe).reduce((sum,x)=>sum+Math.max(0,-x.r.personalDelta),0);
+ const habit=results.find(x=>!x.r.verified)?.e.habit??'Keep checking requests through independently saved contacts.';
+ return <div className={styles.resultOverlay} ref={ref} role="dialog" aria-modal="true" aria-label="Your journey results"><section className={styles.results}><Mascot mood="caught"/><h1>A million, and counting.</h1><p>You have completed this lifetime. Scamagotchi is still lurking.</p><div className={styles.resultStats}><span><small>Money held</small><strong>{'S$'+money(s.cash)}</strong></span><span><small>Verification demonstrated</small><strong>{results.filter(x=>x.r.verified).length} / {ENCOUNTERS.length}</strong></span><span><small>Personal scam losses</small><strong>{'S$'+money(lost)}</strong></span></div><p><strong>Practice next</strong><br/>{habit}</p><p>Legitimate opportunities declined: {results.filter(x=>x.r.missed).length}. Declining a verified personal loan is always your choice.</p>
+ <div className={styles.resultList}>{results.map(({e,r})=><details key={e.id}><summary><span>{e.title}</span><small>{e.scam?'Scam':'Genuine'} · {r.verified?'Checked independently':r.unsafe?'Unsafe action':'Decision recorded'}</small></summary><p>{personalise(r.decision==='proceed'?e.success:r.decision==='report'?e.scam?'You reported the request and did not send money.':'You reported a genuine request. No real report was sent.':e.declined,s.character.name)}</p><p>{e.lesson}</p><small>You checked: {r.inspectedEvidence.map(id=>e.evidence.find(v=>v.id===id)?.title).join(', ')||'no records'}.</small></details>)}</div><p className={styles.muted}>This is a record of your playthrough, not a scam-proof score.</p><div className={styles.modalActions}><button className={styles.primary} onClick={onContinue}>Keep playing <ArrowRight size={18}/></button><button className={styles.secondary} onClick={onReset}>New game</button><button className={styles.secondary} onClick={onDownload}>Download run</button></div></section></div>;
+}
 
 
