@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Dispatch } from 'react';
 import { Ban, Check, ChevronLeft, Flag, MoreHorizontal, Save, ShieldCheck } from 'lucide-react';
-import type { EncounterVariant } from './content';
-import type { Action, Progress, SafetyReason } from './game';
-import { safetyPractice } from './game';
+import type { EncounterVariant } from '../../game/content';
+import type { Action, Progress, SafetyReason } from '../../game/game';
+import { safetyPractice } from '../../game/game';
 import HelpResources from './HelpResources';
 import { PLATFORM_GUIDES } from './safetyResources';
 import styles from './SafetyPractice.module.css';

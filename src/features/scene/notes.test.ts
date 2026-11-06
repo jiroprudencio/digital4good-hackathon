@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, rates, reducer } from './game';
+import { createGame, rates, reducer } from '../../game/game';
 import { noteBundle } from './notes';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

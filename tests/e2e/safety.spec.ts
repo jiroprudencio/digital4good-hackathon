@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { CASES, ENCOUNTERS } from '../src/content';
-import { createGame, SAVE_KEY, type GameState } from '../src/game';
+import { CASES, ENCOUNTERS } from '../../src/game/content';
+import { createGame, SAVE_KEY, type GameState } from '../../src/game/game';
 
 const phone = (page: Page) => page.getByTestId('phone');
 const practice = (page: Page) =>

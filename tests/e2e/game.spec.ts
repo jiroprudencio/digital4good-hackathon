@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { CASES, ENCOUNTERS, STAGES, type EncounterVariant } from '../src/content';
-import { createGame, SAVE_KEY, type GameState } from '../src/game';
-import { availableContacts } from '../src/profiles';
+import { CASES, ENCOUNTERS, STAGES, type EncounterVariant } from '../../src/game/content';
+import { createGame, SAVE_KEY, type GameState } from '../../src/game/game';
+import { availableContacts } from '../../src/game/profiles';
 
 const cashValue = async (page: Page) =>
   Number((await page.getByTestId('balance').innerText()).replace(/[^\d.]/g, ''));

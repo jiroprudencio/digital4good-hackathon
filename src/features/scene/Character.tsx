@@ -1,4 +1,4 @@
-import type { Character as Player } from './profiles';
+import type { Character as Player } from '../../game/profiles';
 
 const COLUMNS = 6;
 const ROWS = 4;

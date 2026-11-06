@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
 import styles from './Scene.module.css';
 import { noteBundle } from './notes';
-import { money } from './content';
+import { money } from '../../game/content';
 import Character from './Character';
-import { DEFAULT_CHARACTER } from './profiles';
-import type { Character as Player } from './profiles';
+import { DEFAULT_CHARACTER } from '../../game/profiles';
+import type { Character as Player } from '../../game/profiles';
 export const SCENE_ART = [
   '/art/school.png',
   '/art/tertiary.png',

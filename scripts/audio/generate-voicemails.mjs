@@ -2,11 +2,13 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { VOICEMAIL_SCRIPTS } from '../src/voicemailScripts.ts';
+import { VOICEMAIL_SCRIPTS } from '../../src/features/voicemail/voicemailScripts.ts';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const config = JSON.parse(await readFile(join(root, 'scripts/elevenlabs-voice.json'), 'utf8'));
-const manifestPath = join(root, 'src/generated/voicemail-audio.json');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const config = JSON.parse(
+  await readFile(join(root, 'scripts/audio/elevenlabs-voice.json'), 'utf8'),
+);
+const manifestPath = join(root, 'src/features/voicemail/generated/voicemail-audio.json');
 const outputDir = join(root, 'public/audio/voicemails');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const checkOnly = process.argv.includes('--check');

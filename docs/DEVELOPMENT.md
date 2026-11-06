@@ -4,16 +4,29 @@
 
 Scamagotchi is a client-side React application written in TypeScript and built with Vite. It has no application server, account system, analytics or runtime AI service. Artwork, fonts and voice recordings are bundled with the game.
 
-| Module                                     | Responsibility                                                                    |
-| ------------------------------------------ | --------------------------------------------------------------------------------- |
-| `src/game.ts`                              | Pure reducer, encounter scheduling, balances, decisions and saved-game validation |
-| `src/content.ts`, `src/youthEncounters.ts` | Authored scenarios, independent evidence and research references                  |
-| `src/App.tsx`                              | Character creation, life-stage progression, settings and journey reflection       |
-| `src/Phone.tsx`                            | Simulated messaging, email, calls, contacts, bank and notifications               |
-| `src/SafetyPractice.tsx`                   | Evidence preservation, reporting and blocking practice                            |
-| `src/profiles.ts`                          | Character configuration, stage profiles and established contacts                  |
-| `src/Scene.tsx`       | Pixel-art scenes, specimen notes and mascot artwork                          |
-| `src/VoicemailAudio.tsx`                   | User-initiated playback, transcripts and audio lifecycle                          |
+```text
+src/
+  app/                 Application shell, character setup and journey screens
+  game/                Pure state transitions, authored encounters and profiles
+  features/
+    phone/             Simulated phone and its apps
+    safety/            Reporting practice and support resources
+    scene/             Character art, banknotes and mascot artwork
+    voicemail/         Playback, scripts and generated recording manifest
+  shared/hooks/        Dialog focus and keyboard lifecycle
+  styles/              Global styles, design tokens and font declarations
+  main.tsx             Browser entry point
+public/                Artwork, fonts and recordings with stable URLs
+scripts/audio/         Offline ElevenLabs generation and integrity checks
+tests/e2e/             Playwright browser journeys
+docs/                  Development notes, credits and README image
+```
+
+Unit tests sit beside the modules they cover. Components keep their CSS Modules in the same feature folder. Browser tests exercise complete user journeys independently of the source layout.
+
+`app` composes the UI features. Features consume `game`; the game layer never imports React, browser APIs or UI features. Shared hooks have no feature dependencies. Use direct imports so dependencies remain visible. Generated voicemail metadata belongs to its playback feature; paid generation tooling stays outside the browser source tree.
+
+This structure adapts [feature-folder guidance](https://redux.js.org/style-guide/#structure-files-as-feature-folders-with-single-file-logic) to React's existing reducer without adding Redux. [React's component guidance](https://react.dev/learn/importing-and-exporting-components) supports splitting reusable responsibilities, while [Vite's public-directory contract](https://vite.dev/guide/assets#the-public-directory) preserves the stable asset URLs used by artwork and recording manifests. [Playwright's guidance](https://playwright.dev/docs/best-practices) informs isolated tests of user-visible behaviour. The project has no backend, so there are no placeholder server or database directories.
 
 ## State and progression
 

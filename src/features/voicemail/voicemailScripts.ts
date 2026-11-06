@@ -1,4 +1,4 @@
-import { ENCOUNTERS } from './content.ts';
+import { ENCOUNTERS } from '../../game/content.ts';
 
 // Only authored dialogue is sent to TTS. Player names and saved-game data
 // never leave the browser. These neutral greetings work for every character.

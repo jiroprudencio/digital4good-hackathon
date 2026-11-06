@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ENCOUNTERS } from '../src/content';
-import { createGame, SAVE_KEY, type GameState } from '../src/game';
-import { VOICEMAIL_SCRIPTS } from '../src/voicemailScripts';
+import { ENCOUNTERS } from '../../src/game/content';
+import { createGame, SAVE_KEY, type GameState } from '../../src/game/game';
+import { VOICEMAIL_SCRIPTS } from '../../src/features/voicemail/voicemailScripts';
 
 const phone = (page: Page) => page.getByTestId('phone');
 const audio = (page: Page) => phone(page).locator('audio[data-voicemail]');
@@ -61,7 +61,7 @@ async function openCall(
   caseId: string,
   options: { declined?: boolean; missing?: boolean; broken?: boolean } = {},
 ) {
-  await page.route('**/src/voicemails.ts*', (route) =>
+  await page.route('**/src/features/voicemail/voicemails.ts*', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: options.missing

@@ -10,7 +10,7 @@ import {
   Settings,
   X,
 } from 'lucide-react';
-import { CASES, ENCOUNTERS, money, shortMoney, STAGES, personalise } from './content';
+import { CASES, ENCOUNTERS, money, shortMoney, STAGES, personalise } from '../game/content';
 import {
   activeCase,
   createGame,
@@ -22,16 +22,17 @@ import {
   safetyPractice,
   SAVE_KEY,
   stageResolved,
-} from './game';
-import type { GameState } from './game';
-import Scene, { EarnNotes, Mascot, SCENE_ART } from './Scene';
-import Character from './Character';
-import { DEFAULT_CHARACTER, GENDERS, SKIN_TONES, STAGE_PROFILES } from './profiles';
-import type { Character as Player } from './profiles';
-import Phone, { useDialogFocus } from './Phone';
+} from '../game/game';
+import type { GameState } from '../game/game';
+import Scene, { EarnNotes, Mascot, SCENE_ART } from '../features/scene/Scene';
+import Character from '../features/scene/Character';
+import { DEFAULT_CHARACTER, GENDERS, SKIN_TONES, STAGE_PROFILES } from '../game/profiles';
+import type { Character as Player } from '../game/profiles';
+import Phone from '../features/phone/Phone';
+import { useDialogFocus } from '../shared/hooks/useDialogFocus';
 import styles from './App.module.css';
-import HelpResources from './HelpResources';
-import { harmLabel } from './safetyResources';
+import HelpResources from '../features/safety/HelpResources';
+import { harmLabel } from '../features/safety/safetyResources';
 const elapsed = (ms: number) =>
   Math.floor(ms / 60000) +
   ':' +

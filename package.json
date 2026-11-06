@@ -9,8 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "audio:generate": "node --experimental-strip-types scripts/generate-voicemails.mjs",
-    "audio:check": "node --experimental-strip-types scripts/generate-voicemails.mjs --check",
+    "audio:generate": "node --experimental-strip-types scripts/audio/generate-voicemails.mjs",
+    "audio:check": "node --experimental-strip-types scripts/audio/generate-voicemails.mjs --check",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

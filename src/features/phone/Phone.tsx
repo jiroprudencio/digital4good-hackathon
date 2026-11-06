@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../../shared/hooks/useDialogFocus';
 import type { CSSProperties, Dispatch, ReactNode } from 'react';
 import {
   ArrowDownLeft,
@@ -32,78 +33,18 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
-import { CASES, money, STAGES, personalise } from './content';
-import type { Decision, Evidence, PhoneApp } from './content';
-import type { Action, GameState } from './game';
-import { activeCase, encounterChannel, safetyPractice } from './game';
-import { STAGE_PROFILES } from './profiles';
-import { Mascot } from './Scene';
-import Character from './Character';
-import VoicemailAudio from './VoicemailAudio';
-import SafetyPractice, { SAFETY_REASONS, SafetyReceipt } from './SafetyPractice';
-import HelpResources from './HelpResources';
+import { CASES, money, STAGES, personalise } from '../../game/content';
+import type { Decision, Evidence, PhoneApp } from '../../game/content';
+import type { Action, GameState } from '../../game/game';
+import { activeCase, encounterChannel, safetyPractice } from '../../game/game';
+import { STAGE_PROFILES } from '../../game/profiles';
+import { Mascot } from '../scene/Scene';
+import Character from '../scene/Character';
+import VoicemailAudio from '../voicemail/VoicemailAudio';
+import SafetyPractice, { SAFETY_REASONS, SafetyReceipt } from '../safety/SafetyPractice';
+import HelpResources from '../safety/HelpResources';
 import styles from './Phone.module.css';
 
-export function useDialogFocus(
-  ref: React.RefObject<HTMLElement | null>,
-  close: () => void,
-  enabled = true,
-  lockScroll = true,
-) {
-  const closeRef = useRef(close);
-  closeRef.current = close;
-  // Capture the opener before React makes its surrounding content inert.
-  // The effect retains this render's value until the dialog closes.
-  const focusBeforeCommit =
-    typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null);
-  useEffect(() => {
-    if (!enabled) return;
-    const before = focusBeforeCommit,
-      root = ref.current;
-    const oldOverflow = document.body.style.overflow;
-    if (lockScroll) document.body.style.overflow = 'hidden';
-    (
-      root?.querySelector<HTMLElement>('[data-dialog-focus]') ??
-      root?.querySelector<HTMLElement>(
-        'button:not(:disabled), [href], input:not(:disabled), select, summary, [tabindex="0"]',
-      )
-    )?.focus();
-    const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeRef.current();
-      }
-      if (event.key !== 'Tab' || !root) return;
-      const items = [
-        ...root.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), [href], input:not(:disabled), select, summary, [tabindex="0"]',
-        ),
-      ].filter((el) => el.getClientRects().length > 0);
-      const first = items[0],
-        last = items[items.length - 1];
-      if (!first) return;
-      if (
-        event.shiftKey &&
-        (document.activeElement === first || !items.includes(document.activeElement as HTMLElement))
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (
-        !event.shiftKey &&
-        (document.activeElement === last || !root.contains(document.activeElement))
-      ) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', key);
-    return () => {
-      document.removeEventListener('keydown', key);
-      if (lockScroll) document.body.style.overflow = oldOverflow;
-      if (before?.isConnected) before.focus();
-    };
-  }, [ref, enabled, lockScroll]);
-}
 const apps: { id: PhoneApp; name: string; icon: typeof Mail; color: string }[] = [
   { id: 'messages', name: 'Messages', icon: Send, color: '#268bd2' },
   { id: 'mail', name: 'Mail', icon: Mail, color: '#fff' },

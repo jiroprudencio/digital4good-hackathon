@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { ENCOUNTERS } from './content';
+import { ENCOUNTERS } from '../../game/content';
 import { VOICEMAIL_SCRIPTS } from './voicemailScripts';
 import { getVoicemailAudio } from './voicemails';
 import manifest from './generated/voicemail-audio.json';
