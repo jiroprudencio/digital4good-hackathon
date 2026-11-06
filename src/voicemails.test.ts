@@ -10,7 +10,7 @@ import manifest from './generated/voicemail-audio.json';
 describe('bundled voicemail recordings', () => {
   const cases = ENCOUNTERS.filter(encounter => encounter.channel === 'calls');
   it('voices every call with the selected voice, including the genuine request', () => {
-    expect(manifest.voice).toEqual({ id: 'Z2vRYxPj8kxx56IA3Ie9', name: 'SG Accent' });
+    expect(manifest.voice).toEqual({ id: 'i9SZdx1xJqqryIiaFdmN', name: 'Kopi Gao - Expressive Singlish' });
     expect(cases.some(encounter => !encounter.scam)).toBe(true);
     expect(Object.keys(manifest.clips).sort()).toEqual(cases.map(encounter => encounter.id).sort());
   });

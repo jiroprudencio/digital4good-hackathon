@@ -75,7 +75,7 @@ Declining or ending an incoming call creates a follow-up message with the record
 
 ### ElevenLabs voice messages
 
-The bundled recordings use the custom **SG Accent** voice, voice ID `Z2vRYxPj8kxx56IA3Ie9`, with the `eleven_multilingual_v2` TTS model. Voice settings live in `scripts/elevenlabs-voice.json`. The three MP3s cover the investigation impersonator, fake friend and genuine community-class call, using the revised authored scripts. Playback defaults to 1.25×; source recordings are generated at normal speed.
+The bundled recordings use **Kopi Gao - Expressive Singlish**, voice ID `i9SZdx1xJqqryIiaFdmN`, with the `eleven_multilingual_v2` TTS model. Voice settings live in `scripts/elevenlabs-voice.json`. The three MP3s cover the investigation impersonator, fake friend and genuine community-class call, using the revised authored scripts. Playback defaults to 1.25×; source recordings are generated at normal speed. Active calls, follow-up voicemails and call-history replay all use the same verified local recordings.
 
 ```sh
 # Generate missing/changed clips; requires ELEVENLABS_API_KEY locally.
@@ -143,7 +143,7 @@ Playwright covers character creation, stage profiles, phone navigation, sender d
 
 The 6 November gameplay/UI review passed **106 unit tests**, **46 functional browser tests** and the production build. Another 32 randomized reducer journeys covered all four upgrades and balance invariants. The review fixed narrow-screen header/settings clipping, dialog focus restoration and initial Results scrolling, phone menu/reply keyboard handling, and call controls hidden below long transcripts. Phone checks cover 320, 390, 430 and 1440px; outer UI checks also cover 768px. Browser journeys accelerate time/funds; natural earning and affordability are covered by reducer simulations. Physical iPhone/Safari and screen-reader sessions have not been tested.
 
-Latest audio validation includes **7 focused audio browser tests** and real-MP3 playback checks for all three SG Accent clips (15.56s, 13.56s and 12.45s source durations, all playing at 1.25× with no third-party playback requests). All 48 character variants were checked as full-body sprites and portraits without clipping. The four note denominations were also checked at base/upgraded counts on desktop and mobile. Production builds verify audio integrity before compiling. Screenshots in `artifacts/qa/` are isolated Edge captures; the live Chrome layout was inspected separately. No first-time human playtests have been completed.
+Audio validation includes **7 focused audio browser tests** and real-MP3 playback checks for all three Kopi Gao clips at 1.25×. All 48 character variants were checked as full-body sprites and portraits without clipping. The four note denominations were also checked at base/upgraded counts on desktop and mobile. Production builds verify audio integrity before compiling. Screenshots in `artifacts/qa/` are isolated Edge captures; the live Chrome layout was inspected separately. No first-time human playtests have been completed.
 
 ## First playtest
 
