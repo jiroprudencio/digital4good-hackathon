@@ -1,16 +1,77 @@
-.recording { width:100%; min-width:0; margin:18px 0; padding:14px; border:1px solid #d9dfe5; border-radius:16px; background:#f6f8fb; color:#202124; text-align:left; }
-.label { display:block; margin-bottom:12px; }
-.recording audio { display:block; width:100%; min-width:0; max-width:100%; height:44px; }
-.recording audio:focus-visible { outline:3px solid #2563ba; outline-offset:3px; border-radius:24px; }
-.transcriptLabel { display:block; margin-top:16px; color:#65717c; }
-.transcript { overflow-wrap:anywhere; }
-.transcript p { margin:10px 0; line-height:1.5; }
-.transcript p:last-child { margin-bottom:0; }
-.disclosure { margin-top:8px; }
-.disclosure summary { display:flex; align-items:center; min-height:44px; cursor:pointer; color:#066bc4; }
-.disclosure summary::before { content:'›'; margin-right:8px; transform:rotate(0deg); }
-.disclosure[open] summary::before { transform:rotate(90deg); }
-.unavailable { margin:8px 0; line-height:1.5; color:#65717c; }
-.recording[data-dark] { background:#ffffff14; border-color:#ffffff24; color:#fff; }
-.recording[data-dark] .transcriptLabel,.recording[data-dark] .unavailable { color:#d0d2d8; }
-.recording[data-dark] .disclosure summary { color:#b8dbff; }
+.recording {
+  width: 100%;
+  min-width: 0;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid #d9dfe5;
+  border-radius: 16px;
+  background: #f6f8fb;
+  color: #202124;
+  text-align: left;
+}
+.label {
+  display: block;
+  margin-bottom: 12px;
+}
+.recording audio {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+}
+.recording audio:focus-visible {
+  outline: 3px solid #2563ba;
+  outline-offset: 3px;
+  border-radius: 24px;
+}
+.transcriptLabel {
+  display: block;
+  margin-top: 16px;
+  color: #65717c;
+}
+.transcript {
+  overflow-wrap: anywhere;
+}
+.transcript p {
+  margin: 10px 0;
+  line-height: 1.5;
+}
+.transcript p:last-child {
+  margin-bottom: 0;
+}
+.disclosure {
+  margin-top: 8px;
+}
+.disclosure summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  color: #066bc4;
+}
+.disclosure summary::before {
+  content: '›';
+  margin-right: 8px;
+  transform: rotate(0deg);
+}
+.disclosure[open] summary::before {
+  transform: rotate(90deg);
+}
+.unavailable {
+  margin: 8px 0;
+  line-height: 1.5;
+  color: #65717c;
+}
+.recording[data-dark] {
+  background: #ffffff14;
+  border-color: #ffffff24;
+  color: #fff;
+}
+.recording[data-dark] .transcriptLabel,
+.recording[data-dark] .unavailable {
+  color: #d0d2d8;
+}
+.recording[data-dark] .disclosure summary {
+  color: #b8dbff;
+}

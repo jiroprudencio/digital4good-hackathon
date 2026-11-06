@@ -1,53 +1,48 @@
-/* Hallmark v2.0.0 | scope: app | redesign: full | themes: Hum, Almanac, Arcade, Dusk, Cobalt | type: browser defaults by request. */
-/* Critique: replace marketing copy and ornamental panels with a tap target, scene and decisions. */
-/* User exceptions: original pixel artwork and simulated phone are the game; all font sizing and custom faces omitted. */
-:root, [data-theme="pocket"] {
+:root,
+[data-theme='pocket'] {
   color-scheme: light;
-  --canvas: #f7f3df; --surface: #fffdf2; --surface-alt: #eee9cc;
-  --ink: #252a23; --muted: #51594a; --rule: #b2b59d;
-  --accent: #eed34f; --accent-ink: #282a19; --focus: #2457a1;
-  --radius: 18px; --edge: 2px; --shadow: 0 4px 0 #c7c3a4;
-  --danger: #a32e26; --positive: #255b34; --veil: #151914b8;
+  --canvas: #f7f3df;
+  --surface: #fffdf2;
+  --surface-alt: #eee9cc;
+  --ink: #252a23;
+  --muted: #51594a;
+  --rule: #b2b59d;
+  --accent: #eed34f;
+  --accent-ink: #282a19;
+  --focus: #2457a1;
+  --radius: 18px;
+  --edge: 2px;
+  --shadow: 0 4px 0 #c7c3a4;
+  --danger: #a32e26;
+  --positive: #255b34;
+  --veil: #151914b8;
 }
-[data-theme="ledger"] {
-  color-scheme: light;
-  --canvas: #ccd4da; --surface: #eff2f3; --surface-alt: #dde3e6;
-  --ink: #18262c; --muted: #3e515a; --rule: #899ba3;
-  --accent: #883455; --accent-ink: #fff5f8; --focus: #883455;
-  --radius: 0; --edge: 1px; --shadow: none;
-  --danger: #a12c28; --positive: #265638; --veil: #13232bb8;
-}
-[data-theme="arcade"] {
-  color-scheme: dark;
-  --canvas: #241a27; --surface: #302535; --surface-alt: #42364a;
-  --ink: #f9f1e7; --muted: #d5c5d5; --rule: #9d869f;
-  --accent: #f7ab51; --accent-ink: #291e16; --focus: #e3ee79;
-  --radius: 2px; --edge: 2px; --shadow: 5px 5px 0 #aab64a;
-  --danger: #ffb5a5; --positive: #d6ed88; --veil: #120e17d1;
-}
-[data-theme="void"] {
-  color-scheme: dark;
-  --canvas: #1d252e; --surface: #293440; --surface-alt: #354452;
-  --ink: #f4f0e6; --muted: #c3cdd4; --rule: #7e919c;
-  --accent: #a8cfbb; --accent-ink: #1f352b; --focus: #e6c099;
-  --radius: 12px; --edge: 1px; --shadow: none;
-  --danger: #ffb5a5; --positive: #b2e0bb; --veil: #101921d1;
-}
-[data-theme="blueprint"] {
-  color-scheme: light;
-  --canvas: #f6f8fc; --surface: #eef2f9; --surface-alt: #dfe7f4;
-  --ink: #182941; --muted: #445974; --rule: #879db8;
-  --accent: #2856b1; --accent-ink: #fffdf5; --focus: #214c9c;
-  --radius: 3px 14px; --edge: 1px; --shadow: 0 3px 0 #91a5c5;
-  --danger: #a12d27; --positive: #245e35; --veil: #101d35b8;
-}
-
 [data-theme='ios'] {
-  --surface: #fff; --surface-alt: #f2f2f7; --ink: #17181a; --muted: #62666d;
-  --rule: #dcdde1; --accent: #0066d6; --accent-ink: #fff; --focus: #005fcc;
-  --positive: #197b3b; --danger: #b3261e; --edge: 1px; --radius: 12px; --shadow: none;
-  --telegram: #248bd3; --phone-green: #29ba50; --contact-gray: #868891; --bank-blue: #235b9a;
-  --gmail-red: #ea4335; --gmail-blue: #4285f4; --gmail-green: #34a853; --gmail-yellow: #fbbc04;
-  --chat-wallpaper: #e0e9db; --chat-sent: #e1ffc7; --chat-date: #526c56;
-  --frame: #202124; --font-body: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; --font-heading: var(--font-body);
+  --surface: #fff;
+  --surface-alt: #f2f2f7;
+  --ink: #17181a;
+  --muted: #62666d;
+  --rule: #dcdde1;
+  --accent: #0066d6;
+  --accent-ink: #fff;
+  --focus: #005fcc;
+  --positive: #197b3b;
+  --danger: #b3261e;
+  --edge: 1px;
+  --radius: 12px;
+  --shadow: none;
+  --telegram: #248bd3;
+  --phone-green: #29ba50;
+  --contact-gray: #868891;
+  --bank-blue: #235b9a;
+  --gmail-red: #ea4335;
+  --gmail-blue: #4285f4;
+  --gmail-green: #34a853;
+  --gmail-yellow: #fbbc04;
+  --chat-wallpaper: #e0e9db;
+  --chat-sent: #e1ffc7;
+  --chat-date: #526c56;
+  --frame: #202124;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  --font-heading: var(--font-body);
 }

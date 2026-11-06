@@ -7,11 +7,13 @@
     "dev": "vite --host 127.0.0.1",
     "build": "npm run audio:check && tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "demo": "vite preview --host 127.0.0.1 --port 5180 --strictPort",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "audio:generate": "node --experimental-strip-types scripts/generate-voicemails.mjs",
-    "audio:check": "node --experimental-strip-types scripts/generate-voicemails.mjs --check"
+    "audio:check": "node --experimental-strip-types scripts/generate-voicemails.mjs --check",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -25,8 +27,13 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "prettier": "3.9.10",
     "typescript": "~5.9.3",
     "vite": "^7.2.0",
     "vitest": "^4.0.0"
+  },
+  "description": "An online safety game built for the GovTech Digital4Good Online Safety Hackathon.",
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

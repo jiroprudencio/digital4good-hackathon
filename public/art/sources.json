@@ -35,16 +35,14 @@
       "file": "characters-short.png",
       "origin": "OpenAI ImageGen",
       "purpose": "Short-haired player and contact sprites, including portrait framing",
-      "design": "Detailed chibi pixel characters on a transparent 1254×1254 atlas. Six skin-tone columns, four life-stage rows: school, tertiary, adult and senior.",
-      "sourceGeneration": "exec-3aea954e-cb15-46ed-b3a9-59a924525fd6.png",
+      "design": "Detailed chibi pixel characters on a transparent 1254Ã—1254 atlas. Six skin-tone columns, four life-stage rows: school, tertiary, adult and senior.",
       "treatment": "Original generated pixels preserved. Runtime SVG clips the selected grid cell and frames the full body or portrait."
     },
     {
       "file": "characters-bob.png",
       "origin": "OpenAI ImageGen",
       "purpose": "Bob-haired player and contact sprites, including portrait framing",
-      "design": "Companion edit of characters-short.png retaining all six skin-tone columns and four life-stage rows, with shoulder-length dark hair and silver-grey hair in the senior row. Transparent 1254×1254 atlas.",
-      "sourceGeneration": "exec-1c0409b0-c694-4a5d-88ce-462de5fae0d7.png",
+      "design": "Companion edit of characters-short.png retaining all six skin-tone columns and four life-stage rows, with shoulder-length dark hair and silver-grey hair in the senior row. Transparent 1254Ã—1254 atlas.",
       "treatment": "Original generated pixels preserved. Runtime SVG clips the selected grid cell and frames the full body or portrait."
     },
     {
@@ -61,39 +59,17 @@
       "design": "Pixel-art interpretation of Singapore's current Portrait Series front composition: Yusof Ishak portrait on the right, pale left panel, engraved denomination typography, ornamental linework and SINGAPORE at the bottom. Lavender SGD2, red SGD10, blue SGD50 and orange SGD100. Every note prominently marked SPECIMEN and GAME NOTE; no usable serials, legal-tender wording, authentic signatures or security-feature simulation.",
       "source": "https://www.mas.gov.sg/currency/circulation-currency/circulation-currency-notes",
       "referenceTreatment": "Official MAS specimen front images for SGD2, SGD10 and SGD50 visually inspected and used as ImageGen composition references. The SGD100 image endpoint returned maintenance; its orange palette and shared Portrait Series design were confirmed from the official text.",
-      "sourceGeneration": "exec-f231ccf1-ac36-4ba7-ba48-25d44c30a90b.png",
       "dimensions": {
         "width": 1774,
         "height": 887
       },
       "treatment": "Original transparent generated image preserved. SVG source-pixel viewBoxes frame each note without raster modifications.",
       "frames": {
-        "2": [
-          27,
-          61,
-          838,
-          372
-        ],
-        "10": [
-          912,
-          61,
-          838,
-          372
-        ],
-        "50": [
-          27,
-          467,
-          838,
-          372
-        ],
-        "100": [
-          912,
-          467,
-          838,
-          372
-        ]
-      },
-      "promptFile": "../../artifacts/qa/notes-portrait-refresh/prompt.json"
+        "2": [27, 61, 838, 372],
+        "10": [912, 61, 838, 372],
+        "50": [27, 467, 838, 372],
+        "100": [912, 467, 838, 372]
+      }
     }
   ]
 }

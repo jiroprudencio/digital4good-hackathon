@@ -5,7 +5,13 @@ import styles from './VoicemailAudio.module.css';
 
 const DEFAULT_PLAYBACK_RATE = 1.25;
 
-export default function VoicemailAudio({ caseId, transcript, collapsed = false, dark = false, paused = false }: {
+export default function VoicemailAudio({
+  caseId,
+  transcript,
+  collapsed = false,
+  dark = false,
+  paused = false,
+}: {
   caseId: string;
   transcript: string[];
   collapsed?: boolean;
@@ -26,7 +32,9 @@ export default function VoicemailAudio({ caseId, transcript, collapsed = false, 
       audio.defaultPlaybackRate = DEFAULT_PLAYBACK_RATE;
       audio.playbackRate = DEFAULT_PLAYBACK_RATE;
     }
-    const pauseWhenHidden = () => { if (document.hidden) audio?.pause(); };
+    const pauseWhenHidden = () => {
+      if (document.hidden) audio?.pause();
+    };
     document.addEventListener('visibilitychange', pauseWhenHidden);
     return () => {
       document.removeEventListener('visibilitychange', pauseWhenHidden);
@@ -34,19 +42,59 @@ export default function VoicemailAudio({ caseId, transcript, collapsed = false, 
     };
   }, [caseId, recording?.src]);
 
-  useEffect(() => { if (paused) audioRef.current?.pause(); }, [paused]);
+  useEffect(() => {
+    if (paused) audioRef.current?.pause();
+  }, [paused]);
 
-  const text = <div id={transcriptId} className={styles.transcript}>{lines.map((line, index) => <p key={index}>{line}</p>)}</div>;
-  return <section className={styles.recording} data-dark={dark || undefined} aria-label="Voice message">
-    <strong className={styles.label}>Voice message</strong>
-    {recording && !failed ? <audio ref={audioRef} src={recording.src} controls preload="none" tabIndex={0}
-      aria-label="Voice message audio" aria-describedby={transcriptId} data-voicemail
-      onError={() => setFailed(true)} onPlay={event => {
-        if (document.hidden || paused) { event.currentTarget.pause(); return; }
-        document.querySelectorAll<HTMLAudioElement>('audio[data-voicemail]').forEach(other => {
-          if (other !== event.currentTarget) other.pause();
-        });
-      }} /> : <p className={styles.unavailable} role="status">Audio unavailable. You can still read the transcript.</p>}
-    {collapsed ? <details className={styles.disclosure}><summary>Transcript</summary>{text}</details> : <><small className={styles.transcriptLabel}>Transcript</small>{text}</>}
-  </section>;
+  const text = (
+    <div id={transcriptId} className={styles.transcript}>
+      {lines.map((line, index) => (
+        <p key={index}>{line}</p>
+      ))}
+    </div>
+  );
+  return (
+    <section className={styles.recording} data-dark={dark || undefined} aria-label="Voice message">
+      <strong className={styles.label}>Voice message</strong>
+      {recording && !failed ? (
+        <audio
+          ref={audioRef}
+          src={recording.src}
+          controls
+          preload="none"
+          tabIndex={0}
+          aria-label="Voice message audio"
+          aria-describedby={transcriptId}
+          data-voicemail
+          onError={() => setFailed(true)}
+          onPlay={(event) => {
+            if (document.hidden || paused) {
+              event.currentTarget.pause();
+              return;
+            }
+            document
+              .querySelectorAll<HTMLAudioElement>('audio[data-voicemail]')
+              .forEach((other) => {
+                if (other !== event.currentTarget) other.pause();
+              });
+          }}
+        />
+      ) : (
+        <p className={styles.unavailable} role="status">
+          Audio unavailable. You can still read the transcript.
+        </p>
+      )}
+      {collapsed ? (
+        <details className={styles.disclosure}>
+          <summary>Transcript</summary>
+          {text}
+        </details>
+      ) : (
+        <>
+          <small className={styles.transcriptLabel}>Transcript</small>
+          {text}
+        </>
+      )}
+    </section>
+  );
 }

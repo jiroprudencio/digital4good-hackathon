@@ -8,13 +8,18 @@ import { getVoicemailAudio } from './voicemails';
 import manifest from './generated/voicemail-audio.json';
 
 describe('bundled voicemail recordings', () => {
-  const cases = ENCOUNTERS.filter(encounter => encounter.channel === 'calls');
+  const cases = ENCOUNTERS.filter((encounter) => encounter.channel === 'calls');
   it('voices every call with the selected voice, including the genuine request', () => {
-    expect(manifest.voice).toEqual({ id: 'i9SZdx1xJqqryIiaFdmN', name: 'Kopi Gao - Expressive Singlish' });
-    expect(cases.some(encounter => !encounter.scam)).toBe(true);
-    expect(Object.keys(manifest.clips).sort()).toEqual(cases.map(encounter => encounter.id).sort());
+    expect(manifest.voice).toEqual({
+      id: 'i9SZdx1xJqqryIiaFdmN',
+      name: 'Kopi Gao - Expressive Singlish',
+    });
+    expect(cases.some((encounter) => !encounter.scam)).toBe(true);
+    expect(Object.keys(manifest.clips).sort()).toEqual(
+      cases.map((encounter) => encounter.id).sort(),
+    );
   });
-  it.each(cases)('$id has intact local audio and a matching anonymous transcript', encounter => {
+  it.each(cases)('$id has intact local audio and a matching anonymous transcript', (encounter) => {
     const recording = getVoicemailAudio(encounter.id);
     expect(recording).toBeDefined();
     expect(recording!.text).toBe(VOICEMAIL_SCRIPTS[encounter.id]);
