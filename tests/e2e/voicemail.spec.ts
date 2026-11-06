@@ -167,7 +167,10 @@ test('declined call has full voicemail transcript and replay from call history o
     .poll(() => audio(page).evaluate((node) => !(node as HTMLAudioElement).paused))
     .toBe(true);
   await history.locator('summary').click();
-  expect(await audio(page).evaluate((node) => (node as HTMLAudioElement).paused)).toBe(true);
+  await expect(history).toHaveJSProperty('open', false);
+  await expect
+    .poll(() => audio(page).evaluate((node) => (node as HTMLAudioElement).paused))
+    .toBe(true);
 });
 
 test('failed audio leaves the exact transcript and an ordinary unavailable message', async ({
