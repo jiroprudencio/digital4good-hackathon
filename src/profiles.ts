@@ -17,11 +17,14 @@ export const STAGE_PROFILES: StageProfile[] = [
     { id: 'maya', name: 'Maya', relationship: 'Concert friend', phone: '•••• 1638', note: 'You agreed to find two tickets for Saturday together.' },
     { id: 'wei', name: 'Wei', relationship: 'Classmate', phone: '•••• 2946', note: 'Your trading-card club meets after class on Wednesdays.' },
     { id: 'organiser', name: 'Harbour Live', relationship: 'Concert organiser', phone: '•••• 3150', note: 'Box office saved when you first checked the event listing.' },
+    { id: 'school-teacher', name: 'Mr Lee', relationship: 'Form teacher', phone: 'Simulated school line', note: 'A trusted adult you can approach about online worries. Contact saved from your school handbook; no real call is made.' },
+    { id: 'school-counsellor', name: 'Ms Tan', relationship: 'School counsellor', phone: 'Simulated school line', note: 'Listens without blaming you and helps plan support. Saved from your school handbook; no real call is made.' },
   ] },
   { age: 22, role: 'Student', organisation: 'Meranti University', goals: ['Semester fees due this month', 'Applying for internships'], contacts: [
     { id: 'finance', name: 'Campus Finance', relationship: 'Fee enquiries', phone: '•••• 1200', email: 'finance@meranti.example', note: 'Saved from your university welcome pack.' },
     { id: 'careers', name: 'Nadia', relationship: 'Careers adviser', phone: '•••• 1230', email: 'careers@meranti.example', note: 'Your adviser helped submit application MU-207.' },
     { id: 'employer', name: 'Linden Studio HR', relationship: 'Internship employer', phone: '•••• 4300', email: 'hr@linden.example', note: 'Contact supplied by the campus careers office before your application.' },
+    { id: 'campus-wellbeing', name: 'Campus Wellbeing', relationship: 'Student support', phone: 'Simulated campus line', email: 'wellbeing@meranti.example', note: 'Support for boundaries, harassment and looking out for a friend. Saved from your welcome pack; this fictional service makes no real call.' },
   ] },
   { age: 35, role: 'Programme executive', organisation: 'IMDA', goals: ['Preparing a team event', 'Waiting for an iPhone delivery'], contacts: [
     { id: 'ethan', name: 'Ethan', relationship: 'Manager', phone: '•••• 7250', email: 'ethan@imda.gov.sg', note: 'Your manager. You discussed Friday’s agenda yesterday. Fictional employee.' },

@@ -1,3 +1,5 @@
+import { YOUTH_ENCOUNTERS } from './youthEncounters.ts';
+
 export type PhoneApp = 'home' | 'notifications' | 'messages' | 'mail' | 'calls' | 'contacts' | 'bank' | 'feedback' | 'profile';
 export type Decision = 'proceed' | 'decline' | 'report';
 export interface Evidence { id: string; app: PhoneApp; title: string; origin: string; body: string[]; call?: boolean; contactId?: string }
@@ -8,14 +10,14 @@ export interface EncounterVariant {
   decisive: string; cost: number; proceed: string; success: string; declined: string;
   lesson: string; habit: string; sources: Source[]; reviewDate: string; confirmText: string;
   senderEmail?: string; replyTo?: string; reward?: number; employerLoss?: number;
-  callTranscript?: string[]; followUp?: string[];
+  callTranscript?: string[]; followUp?: string[]; harm?: 'grooming' | 'cyberbullying';
 }
 export interface Stage { name: string; chapter: string; setting: string; description: string; tap: number; upgrade: string; upgradeDescription: string; cost: number; gate: number; color: string }
 export const STAGES: Stage[] = [
-  { name: 'School', chapter: '01', setting: 'School', description: 'Concert plans and trading cards.', tap: 2, upgrade: 'Study routine', upgradeDescription: 'Double your tap earnings this stage.', cost: 200, gate: 1000, color: '#a7cf91' },
-  { name: 'Tertiary', chapter: '02', setting: 'Tertiary education', description: 'Semester fees and internship applications.', tap: 10, upgrade: 'Better workspace', upgradeDescription: 'Double your tap earnings this stage.', cost: 2000, gate: 10000, color: '#e4be79' },
-  { name: 'Adult', chapter: '03', setting: 'Adult life', description: 'Work commitments and a new delivery.', tap: 50, upgrade: 'Work toolkit', upgradeDescription: 'Double your tap earnings this stage.', cost: 20000, gate: 100000, color: '#e1a083' },
-  { name: 'Senior', chapter: '04', setting: 'Retired at home', description: 'Old friends and new plans.', tap: 100, upgrade: 'Hobby workspace', upgradeDescription: 'Double your tap earnings this stage.', cost: 100000, gate: 1000000, color: '#b7aad6' },
+  { name: 'School', chapter: '01', setting: 'School', description: 'Friendships, group chats and online boundaries.', tap: 2, upgrade: 'Study routine', upgradeDescription: 'Double your tap earnings this stage.', cost: 200, gate: 1000, color: '#a7cf91' },
+  { name: 'Tertiary', chapter: '02', setting: 'Tertiary education', description: 'Campus life, opportunities and looking out for others.', tap: 10, upgrade: 'Better workspace', upgradeDescription: 'Double your tap earnings this stage.', cost: 2000, gate: 10000, color: '#e4be79' },
+  { name: 'Adult', chapter: '03', setting: 'Adult life', description: 'Work, everyday requests and checking who to trust.', tap: 50, upgrade: 'Work toolkit', upgradeDescription: 'Double your tap earnings this stage.', cost: 20000, gate: 100000, color: '#e1a083' },
+  { name: 'Senior', chapter: '04', setting: 'Retired at home', description: 'Staying connected and making informed choices.', tap: 100, upgrade: 'Hobby workspace', upgradeDescription: 'Double your tap earnings this stage.', cost: 100000, gate: 1000000, color: '#b7aad6' },
 ];
 export function personalise(text: string, name: string) { return text.replaceAll('{name}', name); }
 
@@ -839,6 +841,8 @@ export const ENCOUNTERS: EncounterVariant[] = [
     ]
   }
 ];
+
+ENCOUNTERS.push(...YOUTH_ENCOUNTERS);
 
 export const CASES: Record<string, EncounterVariant> = Object.fromEntries(ENCOUNTERS.map(e => [e.id, e]));
 export const money = (cents: number) => (cents / 100).toLocaleString('en-SG', { maximumFractionDigits: 2 });

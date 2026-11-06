@@ -177,7 +177,7 @@ test('declining an incoming call delivers a message and does not resolve the enc
 });
 
 for (const mode of ['verified', 'mistakes'] as const) {
-  test('all twelve encounters and stage briefings finish a ' + mode + ' run', async ({ page }) => {
+  test('all encounters and stage briefings finish a ' + mode + ' run', async ({ page }) => {
     test.setTimeout(180000);
     await page.clock.install({ time: new Date('2026-11-06T09:40:00Z') });
     await seed(page, stageSave()); await page.goto('/');
@@ -187,7 +187,7 @@ for (const mode of ['verified', 'mistakes'] as const) {
         await expect(page.getByTestId('stage-profile')).toBeVisible();
         await page.getByTestId('stage-profile').getByRole('button', { name: 'Next', exact: true }).click();
       }
-      for (let index = 0; index < 3; index++) {
+      for (let index = 0; index < ENCOUNTERS.filter(encounter => encounter.stage === stage).length; index++) {
         for (let tap = 0; tap < 5; tap++) await page.getByTestId('earn').click();
         if (stage > 0 || index > 0) await page.clock.runFor(10000);
         const state = await stored(page);
@@ -202,8 +202,8 @@ for (const mode of ['verified', 'mistakes'] as const) {
     await expect(page.getByRole('dialog', { name: 'Your journey results', exact: true })).toBeVisible();
     const saved = await stored(page);
     expect(saved.finished).toBe(true);
-    expect(Object.values(saved.progress).filter(p => p.result)).toHaveLength(12);
-    expect(Object.values(saved.progress).filter(p => p.result?.unsafe)).toHaveLength(mode === 'verified' ? 0 : 8);
+    expect(Object.values(saved.progress).filter(p => p.result)).toHaveLength(ENCOUNTERS.length);
+    expect(Object.values(saved.progress).filter(p => p.result?.unsafe)).toHaveLength(mode === 'verified' ? 0 : ENCOUNTERS.filter(encounter=>encounter.scam).length);
     expect(saved.cash).toBeGreaterThanOrEqual(100000000);
     await page.getByRole('button', { name: 'Keep playing', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Your journey results', exact: true })).toHaveCount(0);
@@ -287,6 +287,71 @@ test('loaded game works offline and mobile phone decisions remain accessible', a
   await expect(phone(page)).toContainText('Verification demonstrated');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile-outcome.png'), fullPage: true });
+});
+
+for (const [stage, required] of [[1, 14], [2, 12]]) {
+  test('legacy stage ' + stage + ' keeps completed orders, savings and unplayed youth cases after reload', async ({ page }) => {
+    const active = CASES[stage === 1 ? 'uni-a' : 'office-a'];
+    const legacy = stageSave(stage, active);
+    const youth = ['school-grooming', 'school-bullying', 'uni-grooming', 'uni-bullying'];
+    legacy.cash = 424200;
+    legacy.order = legacy.order.map(ids => ids.filter(id => !youth.includes(id)));
+    for (const id of youth) delete legacy.progress[id];
+    await seed(page, legacy); await page.goto('/');
+    await expect(page.getByTestId('decision-card')).toBeVisible();
+    let restored = await stored(page);
+    expect(restored.stage).toBe(stage);
+    expect(restored.cash).toBe(424200);
+    expect(restored.phone.caseId).toBe(active.id);
+    expect(restored.order.flat()).toHaveLength(required);
+    expect(restored.order.slice(0, stage)).toEqual(legacy.order.slice(0, stage));
+    for (const id of youth) expect(restored.progress[id]).toMatchObject({ arrived: false, evidence: [], result: null });
+    await expect(page.locator('footer').last()).toContainText('New youth scenarios are available in a fresh run.');
+    await page.reload();
+    restored = await stored(page);
+    expect(restored.cash).toBe(424200);
+    expect(restored.order.flat()).toHaveLength(required);
+    expect(restored.progress[active.id].result).toBeNull();
+    await expect(page.getByTestId('earn')).toBeDisabled();
+  });
+}
+
+test('completed legacy twelve-case run keeps its results and can continue without invented youth completions', async ({ page }) => {
+  const legacy = stageSave(3);
+  const youth = ['school-grooming', 'school-bullying', 'uni-grooming', 'uni-bullying'];
+  legacy.order = legacy.order.map(ids => ids.filter(id => !youth.includes(id)));
+  for (const id of youth) delete legacy.progress[id];
+  for (const encounter of ENCOUNTERS.filter(e => e.stage === 3)) {
+    legacy.progress[encounter.id] = { arrived: true, read: true, evidence: [], samplePaid: false, callStatus: 'answered',
+      result: { decision: 'decline', verified: false, unsafe: false, personalDelta: 0, employerLoss: 0, inspectedEvidence: [], missed: false } };
+  }
+  legacy.finished = true;
+  await seed(page, legacy); await page.goto('/');
+  const results = page.getByRole('dialog', { name: 'Your journey results', exact: true });
+  await expect(results).toBeVisible();
+  await expect(results).toContainText('0 / 12');
+  await expect(results).toContainText('Your saved journey keeps its original completed stages.');
+  const before = (await stored(page)).cash;
+  await results.getByRole('button', { name: 'Keep playing', exact: true }).click();
+  await page.getByTestId('earn').click();
+  expect((await stored(page)).cash).toBe(before + STAGES[3].tap * 100);
+  await page.reload();
+  await expect(page.getByTestId('earn')).toBeEnabled();
+  for (const id of youth) expect((await stored(page)).progress[id].result).toBeNull();
+  expect((await stored(page)).order.flat()).toHaveLength(12);
+});
+
+test('a partially erased sixteen-case save shows recovery without overwriting the original', async ({ page }) => {
+  const malformed = stageSave();
+  delete malformed.progress['school-grooming'];
+  malformed.order[0] = malformed.order[0].filter(id => id !== 'school-grooming');
+  const raw = JSON.stringify(malformed);
+  await seed(page, malformed); await page.goto('/');
+  await expect(page.getByRole('status').filter({ hasText: 'Your save could not be read' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download backup', exact: true })).toBeVisible();
+  expect(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY)).toBe(raw);
+  await page.reload();
+  expect(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY)).toBe(raw);
 });
 
 test('capture implemented interfaces for approved-render comparison', async ({ page }) => {

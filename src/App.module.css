@@ -19,6 +19,7 @@
 .note svg{width:100%;height:auto}.floating{position:absolute;top:30%;left:40%;pointer-events:none;font-weight:bold;background:var(--surface);padding:4px 10px;border-radius:8px;animation:floatUp .7s ease-out forwards}
 .tapHint{font-weight:bold;background:var(--accent);border:1px solid var(--rule);border-radius:12px;padding:10px 18px;margin:6px 0 20px}
 .goal{display:grid;gap:12px;align-self:stretch;border-top:1px solid var(--rule);padding-top:16px}.goal small{color:var(--muted)}
+.practiceSummary{margin:20px 0;padding:18px;border:1px solid var(--rule);border-radius:14px;background:var(--surface);text-align:left}.practiceSummary h2{font-family:var(--font-body);font-size:1.1rem;margin:0 0 12px}.practiceSummary ul{display:grid;gap:8px;padding-left:20px}.practiceSummary p{line-height:1.55}
 .scenePanel{flex:1.6;min-width:0;border-radius:20px;overflow:hidden;display:grid;grid-template-rows:minmax(0,1fr) auto;background:var(--surface);border:2px solid var(--rule)}
 .sceneArt{min-height:0;position:relative}.sceneTag{position:absolute;left:16px;bottom:14px;background:#fffdf2ed;border:1px solid var(--rule);border-radius:10px;padding:6px 12px;max-width:90%;overflow-wrap:anywhere}
 .stageControls{padding:16px;display:grid;gap:16px}.upgradeRow{display:flex;align-items:center;justify-content:space-between;gap:12px}.upgradeRow>span{display:grid;gap:4px}.upgradeRow small{color:var(--muted)}.upgradeRow button{white-space:nowrap}

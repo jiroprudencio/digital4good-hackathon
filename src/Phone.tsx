@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, ReactNode } from 'react';
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, BatteryFull, Bell, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileText, Home, Mail, MessageCircle, MoreHorizontal, PhoneCall, PhoneOff, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Ban, BatteryFull, Bell, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileText, Flag, Home, Mail, MessageCircle, MoreHorizontal, PhoneCall, PhoneOff, Save, Search, Send, ShieldCheck, Signal, Smartphone, Users, Wallet, Wifi, X } from 'lucide-react';
 import { CASES, money, STAGES, personalise } from './content';
 import type { Decision, Evidence, PhoneApp } from './content';
 import type { Action, GameState } from './game';
-import { activeCase, encounterChannel } from './game';
+import { activeCase, encounterChannel, safetyPractice } from './game';
 import { STAGE_PROFILES } from './profiles';
 import { Mascot } from './Scene';
 import Character from './Character';
 import VoicemailAudio from './VoicemailAudio';
+import SafetyPractice, { SAFETY_REASONS, SafetyReceipt } from './SafetyPractice';
+import HelpResources from './HelpResources';
 import styles from './Phone.module.css';
 
 export function useDialogFocus(ref: React.RefObject<HTMLElement | null>, close: () => void, enabled = true, lockScroll = true) {
@@ -46,14 +48,19 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
   const ref = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null), swipeStart = useRef<number | null>(null);
   const replyRef = useRef<HTMLElement>(null), replyReturn = useRef<HTMLButtonElement | null>(null);
+  const feedbackHeading = useRef<HTMLHeadingElement>(null);
   const [confirm, setConfirm] = useState<Decision | null>(null), [query, setQuery] = useState('');
   const [senderOpen, setSenderOpen] = useState(false), [contactId, setContactId] = useState<string | null>(null);
   const [contactCall, setContactCall] = useState(false), [replyOpen, setReplyOpen] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
+  const [practiceCaseId, setPracticeCaseId] = useState<string | null>(null);
+  const [practiceEntry, setPracticeEntry] = useState<'overview' | 'report' | 'block'>('overview');
+  const safetyReturn = useRef<HTMLElement | null>(null);
   const scrollPositions = useRef(new Map<string, number>());
   const requestedContact = useRef<string | null>(null);
   const locationKey = s.phone.app + ':' + s.phone.caseId + ':' + s.phone.record + ':' + (s.phone.app === 'contacts' ? contactId : '');
   const id = s.phone.caseId, e = id ? CASES[id] : null, p = id ? s.progress[id] : null;
+  const practiceVisible = practiceCaseId === id && Boolean(e && p);
   const pending = activeCase(s), waiting = pending ? CASES[pending] : null;
   const profile = STAGE_PROFILES[s.stage];
   const contacts = [...new Map(STAGE_PROFILES.slice(0, s.stage + 1).flatMap(stage => stage.contacts).map(c => [c.id, c])).values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -98,15 +105,39 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
     replyRef.current?.scrollIntoView({ block: 'nearest' });
     replyRef.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
   }, [replyOpen]);
+  useEffect(() => {
+    if (s.phone.app !== 'feedback' || !p?.result) return;
+    setPracticeCaseId(null);
+  }, [s.phone.app, s.phone.caseId, p?.result?.decision]);
+  useEffect(() => {
+    if (s.phone.app !== 'feedback' || !p?.result || practiceVisible) return;
+    const frame = requestAnimationFrame(() => feedbackHeading.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [s.phone.app, s.phone.caseId, p?.result?.decision, practiceVisible]);
   const toggleReply = (button: HTMLButtonElement) => { replyReturn.current = button; setReplyOpen(!replyOpen); };
   const closeReply = () => { setReplyOpen(false); replyReturn.current?.focus(); };
   const rememberScroll = () => { if (content.current) scrollPositions.current.set(locationKey, content.current.scrollTop); };
-  const navigate = (app: PhoneApp, list = false) => { rememberScroll(); setConfirm(null); dispatch({ type: 'APP', app, list }); };
-  const select = (caseId: string) => { rememberScroll(); setConfirm(null); dispatch({ type: 'CASE', id: caseId }); };
+  const navigate = (app: PhoneApp, list = false) => { rememberScroll(); setConfirm(null); setPracticeCaseId(null); dispatch({ type: 'APP', app, list }); };
+  const select = (caseId: string) => { rememberScroll(); setConfirm(null); setPracticeCaseId(null); dispatch({ type: 'CASE', id: caseId }); };
   const inspect = (v: Evidence) => { dispatch({ type: 'INSPECT', id: v.id }); };
   const returnToRequest = () => { if (pending) select(pending); else if (id) select(id); };
   const openContact = (contact: string) => { rememberScroll(); setHeaderMenu(false); setContactId(contact); setContactCall(false); };
   const backToContacts = () => { rememberScroll(); setHeaderMenu(false); setContactId(null); setContactCall(false); navigate('contacts'); };
+  function beginSafety(caseId = id ?? pending, entry: typeof practiceEntry = 'overview') {
+    if (!caseId || !s.progress[caseId]?.arrived) return;
+    safetyReturn.current = document.activeElement as HTMLElement | null;
+    setConfirm(null); setHeaderMenu(false); setReplyOpen(false);
+    dispatch({ type: 'CASE', id: caseId });
+    if (CASES[caseId].channel === 'calls' && !s.progress[caseId].result && s.progress[caseId].callStatus !== 'declined') dispatch({ type: 'CALL_DECLINE' });
+    setPracticeEntry(entry); setPracticeCaseId(caseId);
+  }
+  function closeSafety() {
+    setPracticeCaseId(null); if (content.current) content.current.scrollTop = 0;
+    requestAnimationFrame(() => {
+      const target = safetyReturn.current?.isConnected ? safetyReturn.current : ref.current?.querySelector<HTMLButtonElement>('[aria-label="More phone options"]');
+      target?.focus({ preventScroll: true });
+    });
+  }
   function searchField(label: string) { return <label className={styles.search}><Search size={18} /><input aria-label={label} placeholder={label} value={query} onChange={ev => setQuery(ev.target.value)} /></label>; }
   function requestCard(caseId: string) {
     const item = CASES[caseId], progress = s.progress[caseId];
@@ -160,38 +191,42 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
   }
   function decisions() {
     if (!e || !p || p.result || e.id !== pending) return <><h3>Request waiting</h3><p>{waiting?.sender}</p><button className={styles.primary} onClick={returnToRequest}>Return to request</button></>;
-    if (e.channel === 'calls' && p.callStatus === 'ringing') return <><h3>Incoming call</h3><p>{t(e.sender)}</p><p>Answer or decline on your phone.</p>{!incoming && <button className={styles.primary} onClick={() => select(e.id)}>Return to call</button>}</>;
+    if (e.channel === 'calls' && p.callStatus === 'ringing') return <><h3>Incoming call</h3><p>{t(e.sender)}</p><p>Answer or decline on your phone.</p>{!incoming && <button className={styles.primary} onClick={() => select(e.id)}>Return to call</button>}<button className={styles.report} onClick={() => beginSafety()}><Flag size={18} aria-hidden="true" /> Report concern</button><small className={styles.investigationHint}>Reporting practice ends this simulated call and opens its follow-up messages.</small></>;
     const affordable = s.cash >= e.cost * 100;
     return <section aria-label="Make a decision">
       <h3>{t(e.sender)}’s request</h3>
       <button className={styles.primary} disabled={!affordable} onClick={() => setConfirm('proceed')}>{t(e.proceed)}{e.cost > 0 && !/S\$|\bSGD\b/.test(e.proceed) && <small>S${money(e.cost * 100)}</small>}</button>
       {!affordable && <p className={styles.hint}>You need S${money(e.cost * 100 - s.cash)} more. You can decline without paying.</p>}
-      <button className={styles.secondary} onClick={() => setConfirm('decline')}>Decline request</button>
-      <button className={styles.secondary} onClick={() => { setConfirm(null); navigate('home'); }}>Keep investigating</button>
-      <button className={styles.report} onClick={() => setConfirm('report')}>Report concern</button>
+      <button className={styles.danger} onClick={() => setConfirm('decline')}><X size={18} aria-hidden="true" /> Decline request</button>
+      <button className={styles.secondary} onClick={() => { setConfirm(null); navigate('home'); }}><Search size={18} aria-hidden="true" /> Keep investigating</button>
+      <button className={styles.report} onClick={() => beginSafety()}><Flag size={18} aria-hidden="true" /> Report concern</button>
       {confirm && <div className={styles.confirm} ref={confirmRef} role="group" aria-label="Confirm your decision">
         <strong>{confirm === 'proceed' ? 'Confirm this action?' : confirm === 'report' ? 'Report this request?' : 'Decline this request?'}</strong>
         <p>{confirm === 'proceed' ? t(e.confirmText) : confirm === 'report' ? 'This records your concern in the game. No real report is sent.' : 'This ends the encounter without accepting the request.'}</p>
-        <div className={styles.confirmActions}><button className={styles.secondary} onClick={() => setConfirm(null)}>Cancel</button><button className={styles.primary} onClick={() => { dispatch({ type: 'RESOLVE', decision: confirm }); setConfirm(null); }}>Confirm {confirm === 'proceed' ? 'action' : 'decision'}</button></div>
+        <div className={styles.confirmActions}><button className={styles.secondary} onClick={() => setConfirm(null)}>Cancel</button><button className={confirm === 'decline' ? styles.dangerConfirm : styles.primary} onClick={() => { dispatch({ type: 'RESOLVE', decision: confirm }); setConfirm(null); }}>Confirm {confirm === 'proceed' ? 'action' : 'decision'}</button></div>
       </div>}
       {!confirm && <small className={styles.investigationHint}>You can still use your phone.</small>}
     </section>;
   }
   function feedback() {
     if (!e || !p?.result) return null;
-    const r = p.result;
+    const r = p.result, harm = e.harm ?? 'scam', practice = safetyPractice(p), nonFinancial = harm !== 'scam';
     return <div className={styles.feedback}>
-      <div className={styles.reveal}><Mascot mood={e.scam ? r.unsafe ? 'smug' : 'caught' : 'caught'} /><h2>{e.scam ? 'Scamagotchi’s scheme' : 'A genuine request'}</h2><p>{e.scam ? 'Scamagotchi was behind this request.' : 'This request was real. Scamagotchi did not get this one.'}</p></div>
-      <section className={styles.feedbackBlock}><h3>What happened</h3><p>{t(r.decision === 'proceed' ? e.success : r.decision === 'report' ? e.scam ? 'You reported the request and did not send money.' : 'You reported a genuine request. No real report was sent.' : e.declined)}</p>
+      <div className={styles.reveal}><Mascot mood={e.scam ? r.unsafe ? 'smug' : 'caught' : 'caught'} /><h2 ref={feedbackHeading} tabIndex={-1}>{e.scam ? harm === 'grooming' ? e.stage === 0 ? 'Grooming and unsafe pressure' : 'Coercive pressure and boundaries' : harm === 'cyberbullying' ? 'Cyberbullying and harassment' : 'Scamagotchi’s scheme' : 'A genuine request'}</h2><p>{e.scam ? nonFinancial ? 'This fictional contact crossed a safety boundary. It is not the targeted person’s fault.' : 'Scamagotchi was behind this request.' : 'This request was genuine. Familiarity alone was not the proof; the independent evidence mattered.'}</p></div>
+      <section className={styles.feedbackBlock}><h3>What happened</h3><p>{t(r.decision === 'proceed' ? e.success : r.decision === 'report' ? e.scam ? 'You practised reporting this concern. Nothing was sent outside the game.' : 'You practised reporting a genuine request. This was a mistaken classification; no real report was sent.' : e.declined)}</p>
         {r.personalDelta !== 0 && <strong className={r.personalDelta > 0 ? styles.gain : styles.loss}>{r.personalDelta > 0 ? '+' : '−'}S${money(Math.abs(r.personalDelta))}</strong>}
         {r.employerLoss > 0 && <p className={styles.loss}>Employer loss: S${money(r.employerLoss * 100)}. Your savings are unchanged.</p>}
       </section>
       <section className={styles.feedbackBlock}><h3>Evidence that mattered</h3><p>{t(e.evidence.find(v => v.id === e.decisive)?.body.join(' ') ?? '')}</p><p>{t(e.lesson)}</p></section>
       <section className={styles.feedbackBlock}><h3>Your checks</h3>{r.inspectedEvidence.length ? <ul>{r.inspectedEvidence.map(key => <li key={key}>{t(e.evidence.find(v => v.id === key)?.title ?? key)}</li>)}</ul> : <p>You decided without opening any supporting records.</p>}<p>{r.verified ? 'You checked the independent evidence before making a safe decision.' : r.inspectedEvidence.includes(e.decisive) ? 'You found the independent evidence, but acted against it.' : 'You did not check the decisive independent source before deciding.'}</p>{r.verified && <span className={styles.skill}><ShieldCheck size={17} /> Verification demonstrated</span>}</section>
       <section className={styles.feedbackBlock}><h3>Next time</h3><p>{t(e.habit)}</p></section>
-      {r.unsafe && <p className={styles.recovery}>In a real incident, contact your bank promptly and make a police report. If work is involved, alert your finance or security team. Recovery is not guaranteed.</p>}
-      <details className={styles.sources}><summary>Sources</summary><small>Reviewed {e.reviewDate}. Fictional characters and requests.</small>{e.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title}<ExternalLink size={13} /></a>)}</details>
+      <SafetyReceipt progress={p} />
+      {practice.reported && practice.reason && <section className={styles.feedbackBlock}><h3>Report reason reflection</h3><p>You chose <strong>{SAFETY_REASONS[practice.reason]}</strong>. {e.scam ? <>This scenario concerned <strong>{SAFETY_REASONS[harm]}</strong>.</> : 'The independent evidence showed that this request was genuine.'}</p><p>Using the report controls is a practice skill. It does not by itself show that the reason was correct.</p></section>}
+      {r.unsafe && <p className={styles.recovery}>{nonFinancial ? 'You deserve support. Stop contact and speak to a trusted adult or a support service. You do not have to handle this alone.' : 'In a real incident, contact your bank promptly and make a police report. If work is involved, alert your finance or security team. Recovery is not guaranteed.'}</p>}
       <button className={styles.primary} onClick={() => dispatch({ type: 'ACK' })}>Continue <ArrowUpRight size={18} /></button>
+      <button className={styles.report} onClick={() => beginSafety(e.id)}><ShieldCheck size={18} aria-hidden="true" /> Review safety steps and evidence</button>
+      <HelpResources harm={harm} />
+      <details className={styles.sources}><summary>Sources</summary><small>Reviewed {e.reviewDate}. Fictional characters and requests.</small>{e.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title}<ExternalLink size={13} /></a>)}</details>
     </div>;
   }
   function callScreen() {
@@ -202,7 +237,8 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
     </div>;
   }
   let body: ReactNode;
-  if (s.phone.app === 'feedback') body = feedback();
+  if (practiceVisible && e && p) body = <SafetyPractice key={e.id + ':' + practiceEntry} encounter={e} progress={p} dispatch={dispatch} personalise={t} entry={practiceEntry} onClose={closeSafety} onFinish={() => { setPracticeCaseId(null); dispatch({ type: 'RESOLVE', decision: 'report' }); }} />;
+  else if (s.phone.app === 'feedback') body = feedback();
   else if (s.phone.app === 'profile') body = myCard();
   else if (incoming || liveCall) body = callScreen();
   else if (s.phone.app === 'notifications') body = <section className={styles.notificationCentre} aria-label="Notification Centre"><div className={styles.lockClock}><h1>9:41</h1><p>Today</p></div><h2>Notification Centre</h2>{arrived.length ? [...arrived].reverse().map(item => {
@@ -231,32 +267,37 @@ export default function Phone({ state: s, dispatch, spotlight }: { state: GameSt
     const replies = e.evidence.filter(v => v.app === s.phone.app && !v.call);
     body = <>
       {isMail ? <><h2 className={styles.mailSubject}>{t(e.title)}</h2><div className={styles.senderRow}><span className={styles.avatar}>{e.initials}</span><div><strong>{t(e.sender)}</strong><button className={styles.senderDisclosure} aria-label="Show sender details" aria-expanded={senderOpen} onClick={() => setSenderOpen(!senderOpen)}>to me <ChevronDown size={14} className={senderOpen ? styles.rotated : undefined} /></button></div><small>9:41</small></div>{senderOpen && <dl className={styles.senderDetails}><dt>From</dt><dd>{t(e.sender)}<br />{e.senderEmail ?? 'sender@example.invalid'}</dd><dt>To</dt><dd>{s.character.name}</dd>{e.replyTo && <><dt>Reply-to</dt><dd>{e.replyTo}</dd></>}<dt>Date</dt><dd>Today, 9:41</dd></dl>}</> : <div className={styles.chatDate}>Today</div>}
+      {safetyPractice(p).blocked && <p className={styles.blockedNotice} role="status"><Ban size={18} aria-hidden="true" />Sender blocked in practice; preserved messages remain available.</p>}
       <div className={isMail ? styles.mailBody : styles.bubbles}>{lines.map((line, n) => <p key={n}>{t(line)}{isChat && <small className={styles.messageTime}>9:{(41 + n).toString().padStart(2, '0')}</small>}</p>)}</div>
       {e.channel === 'calls' && p.callStatus === 'declined' && <VoicemailAudio key={locationKey} caseId={e.id} transcript={(e.callTranscript ?? e.messages).map(t)} collapsed paused={Boolean(pending && !s.phone.open)} />}
       {replies.filter(v => !/reply|reassur|sender|profile/i.test(v.id) && !/Earlier|Archived|Original|Existing/i.test(v.origin)).map(evidenceRow)}
       {record && record.app === s.phone.app && recordCard(record)}
       {replyOpen && <section className={styles.replySheet} ref={replyRef}><h3>Reply to {t(e.sender)}</h3>{replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).length ? replies.filter(v => /reply|reassur|sender|profile/i.test(v.id)).map(v => <button className={styles.replyOption} key={v.id} onClick={() => { inspect(v); setReplyOpen(false); }}>Could you confirm the details? <Send size={16} /></button>) : <p>This conversation contains all the details provided so far. Your phone’s other apps are available from the home bar.</p>}<button className={styles.textButton} onClick={closeReply}>Close</button></section>}
       {p.result && <button className={styles.textButton} onClick={() => navigate('feedback')}>Read outcome <ChevronRight size={16} /></button>}
-      {isMail && <div className={styles.mailReplies}><button onClick={event => toggleReply(event.currentTarget)}><ArrowLeft size={18} /> Reply</button></div>}
+      {isMail && <div className={styles.mailReplies}><button disabled={safetyPractice(p).blocked} onClick={event => toggleReply(event.currentTarget)}><ArrowLeft size={18} /> Reply</button></div>}
     </>;
   } else body = <Empty icon={<Smartphone />} text="Your phone is ready" />;
-  const title = s.phone.app === 'profile' ? 'My Card' : s.phone.app === 'feedback' ? 'Outcome' : s.phone.app === 'notifications' ? '' : inConversation && isChat && e ? t(e.sender) : apps.find(app => app.id === s.phone.app)?.name ?? '';
+  const title = practiceVisible ? 'Safety actions' : s.phone.app === 'profile' ? 'My Card' : s.phone.app === 'feedback' ? 'Outcome' : s.phone.app === 'notifications' ? '' : inConversation && isChat && e ? t(e.sender) : apps.find(app => app.id === s.phone.app)?.name ?? '';
   const contactsBack = s.phone.app === 'profile' || (s.phone.app === 'contacts' && !!selectedContact);
   return <div className={styles.panel} data-testid="phone" data-theme="ios" ref={ref} role={spotlight ? 'dialog' : 'region'} aria-modal={spotlight || undefined} aria-label="Your simulated phone" onKeyDown={event => {
-    if (event.key === 'Escape' && headerMenu) {
+    if (event.key === 'Escape' && confirm) {
+      event.preventDefault(); event.stopPropagation(); setConfirm(null);
+    } else if (event.key === 'Escape' && headerMenu) {
       event.preventDefault(); event.stopPropagation(); setHeaderMenu(false);
       ref.current?.querySelector<HTMLButtonElement>('[aria-label="More phone options"]')?.focus();
     } else if (event.key === 'Escape' && replyOpen) {
       event.preventDefault(); event.stopPropagation(); closeReply();
+    } else if (event.key === 'Escape' && practiceVisible) {
+      event.preventDefault(); event.stopPropagation(); closeSafety();
     }
   }}>
     <div className={styles.phone} style={{ '--wallpaper': "url('/art/iphone-wallpaper.jpg')" } as CSSProperties} data-app={s.phone.app} data-call={incoming || liveCall || undefined}>
       <button className={styles.status} aria-label="Open notification centre from top bar" title="Notifications (swipe down)" onClick={() => navigate('notifications')} onPointerDown={ev => { swipeStart.current = ev.clientY; ev.currentTarget.setPointerCapture(ev.pointerId); }} onPointerUp={ev => { if (swipeStart.current !== null && ev.clientY - swipeStart.current > 28) navigate('notifications'); swipeStart.current = null; }} onPointerCancel={() => { swipeStart.current = null; }}><strong>9:41</strong><span className={styles.camera} /><span><Signal size={14} /><Wifi size={14} /><BatteryFull size={19} /></span></button>
-      {!incoming && !liveCall && <header className={styles.header}><button aria-label={contactsBack ? 'Back to contacts' : inConversation || archivedRecord ? isMail ? 'Back to inbox' : 'Back to chats' : 'Phone home'} onClick={() => contactsBack ? backToContacts() : inConversation || archivedRecord ? navigate(s.phone.app, true) : navigate('home')}><ChevronLeft size={23} />{contactsBack ? <span>Contacts</span> : inConversation && isChat && <span>Chats</span>}</button><span className={styles.headerTitle}>{inConversation && isChat && <span className={styles.smallAvatar}>{e?.initials}</span>}<strong>{contactsBack && selectedContact ? '' : title}</strong></span><button aria-label="More phone options" aria-expanded={headerMenu} onClick={() => setHeaderMenu(!headerMenu)}><MoreHorizontal size={22} /></button></header>}
-      {headerMenu && <div className={styles.headerMenu}><button onClick={() => navigate('notifications')}><Bell size={17} />Notifications</button><button onClick={() => navigate('profile')}><Users size={17} />My Card</button><button onClick={() => navigate('home')}><Home size={17} />Home</button></div>}
-      <div className={styles.content} data-conversation={inConversation || undefined} ref={content} onScroll={rememberScroll}>{body}</div>
+      {!incoming && !liveCall && <header className={styles.header}><button aria-label={practiceVisible ? 'Back to conversation' : contactsBack ? 'Back to contacts' : inConversation || archivedRecord ? isMail ? 'Back to inbox' : 'Back to chats' : 'Phone home'} onClick={() => practiceVisible ? closeSafety() : contactsBack ? backToContacts() : inConversation || archivedRecord ? navigate(s.phone.app, true) : navigate('home')}><ChevronLeft size={23} />{!practiceVisible && (contactsBack ? <span>Contacts</span> : inConversation && isChat && <span>Chats</span>)}</button><span className={styles.headerTitle}>{inConversation && isChat && !practiceVisible && <span className={styles.smallAvatar}>{e?.initials}</span>}<strong>{contactsBack && selectedContact ? '' : title}</strong></span><button aria-label="More phone options" aria-expanded={headerMenu} onClick={() => setHeaderMenu(!headerMenu)}><MoreHorizontal size={22} /></button></header>}
+      {headerMenu && <div className={styles.headerMenu}>{e && p && inConversation && (isChat || isMail) && !practiceVisible && <><button onClick={() => beginSafety(e.id)}><Save size={17} />Save evidence</button><button onClick={() => beginSafety(e.id, 'report')}><Flag size={17} />{isMail ? 'Report phishing or spam' : 'Report message'}</button><button onClick={() => beginSafety(e.id, 'block')}><Ban size={17} />Block sender</button></>}<button onClick={() => navigate('notifications')}><Bell size={17} />Notifications</button><button onClick={() => navigate('profile')}><Users size={17} />My Card</button><button onClick={() => navigate('home')}><Home size={17} />Home</button></div>}
+      <div className={styles.content} data-phone-content data-conversation={inConversation || undefined} ref={content} onScroll={rememberScroll}>{body}</div>
       {(incoming || liveCall) && <div className={styles.callButtons}>{incoming ? <><button aria-label="Decline call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>Decline</button><button aria-label="Accept call" onClick={() => dispatch({ type: 'CALL_ANSWER' })}><span className={styles.acceptCall}><PhoneCall size={28} /></span>Accept</button></> : <button aria-label="End call" onClick={() => dispatch({ type: 'CALL_DECLINE' })}><span className={styles.endCall}><PhoneOff size={28} /></span>End call</button>}</div>}
-      {inConversation && isChat && <div className={styles.composer}><button aria-label="Reply to message" onClick={event => toggleReply(event.currentTarget)}><span>Message</span><Send size={19} /></button></div>}
+      {inConversation && isChat && !practiceVisible && <div className={styles.composer}><button aria-label="Reply to message" disabled={Boolean(p && safetyPractice(p).blocked)} onClick={event => toggleReply(event.currentTarget)}><span>{p && safetyPractice(p).blocked ? 'Sender blocked' : 'Message'}</span><Send size={19} /></button></div>}
       {(s.phone.app === 'calls' || s.phone.app === 'contacts') && !incoming && !liveCall && <nav className={styles.phoneTabs} aria-label="Phone sections"><button aria-current={s.phone.app === 'calls' ? 'page' : undefined} onClick={() => navigate('calls')}><PhoneCall size={20} />Recents</button><button aria-current={s.phone.app === 'contacts' ? 'page' : undefined} onClick={() => navigate('contacts')}><Users size={20} />Contacts</button></nav>}
       {import.meta.env.DEV && pending && s.phone.open && <button className={styles.devExit} onClick={() => dispatch({ type: 'DEV_EXIT' })}>Exit request (dev) <X size={13} /></button>}
       {!s.phone.open && pending && <button className={styles.resumeRequest} onClick={returnToRequest}>Resume request</button>}
