@@ -96,7 +96,7 @@ export const STAGE_PROFILES: StageProfile[] = [
   {
     age: 22,
     role: 'Student',
-    organisation: 'Meranti University',
+    organisation: 'Singapore Institute of Technology',
     goals: ['Semester fees due this month', 'Applying for internships'],
     contacts: [
       {
@@ -104,7 +104,7 @@ export const STAGE_PROFILES: StageProfile[] = [
         name: 'Campus Finance',
         relationship: 'Fee enquiries',
         phone: '•••• 1200',
-        email: 'finance@meranti.example',
+        email: 'finance@sit.example',
         note: 'Saved from your university welcome pack.',
       },
       {
@@ -112,7 +112,7 @@ export const STAGE_PROFILES: StageProfile[] = [
         name: 'Nadia',
         relationship: 'Careers adviser',
         phone: '•••• 1230',
-        email: 'careers@meranti.example',
+        email: 'careers@sit.example',
         note: 'Your adviser helped submit application MU-207.',
       },
       {
@@ -128,7 +128,7 @@ export const STAGE_PROFILES: StageProfile[] = [
         name: 'Campus Wellbeing',
         relationship: 'Student support',
         phone: 'Simulated campus line',
-        email: 'wellbeing@meranti.example',
+        email: 'wellbeing@sit.example',
         note: 'Support for boundaries, harassment and looking out for a friend. Saved from your welcome pack; this fictional service makes no real call.',
       },
     ],
