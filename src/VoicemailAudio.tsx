@@ -3,6 +3,8 @@ import { getVoicemailAudio } from './voicemails';
 import { VOICEMAIL_SCRIPTS } from './voicemailScripts';
 import styles from './VoicemailAudio.module.css';
 
+const DEFAULT_PLAYBACK_RATE = 1.25;
+
 export default function VoicemailAudio({ caseId, transcript, collapsed = false, dark = false, paused = false }: {
   caseId: string;
   transcript: string[];
@@ -20,6 +22,10 @@ export default function VoicemailAudio({ caseId, transcript, collapsed = false, 
   useEffect(() => {
     setFailed(false);
     const audio = audioRef.current;
+    if (audio) {
+      audio.defaultPlaybackRate = DEFAULT_PLAYBACK_RATE;
+      audio.playbackRate = DEFAULT_PLAYBACK_RATE;
+    }
     const pauseWhenHidden = () => { if (document.hidden) audio?.pause(); };
     document.addEventListener('visibilitychange', pauseWhenHidden);
     return () => {
